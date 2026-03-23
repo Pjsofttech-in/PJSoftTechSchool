@@ -1,5 +1,5 @@
 import {create} from 'zustand';
-import {saveSession, clearSession, getSessionAsync} from '@utils/storage';
+import {saveSession, clearSession, getSessionAsync, restoreSession} from '@utils/storage';
 
 const useAuthStore = create(set => ({
   user: null,
@@ -13,6 +13,7 @@ const useAuthStore = create(set => ({
     try {
       const {token, user, role} = await getSessionAsync();
       if (token && user && role) {
+        restoreSession(token, user, role); // restore cache for axios interceptor
         set({
           token,
           user,

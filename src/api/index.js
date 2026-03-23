@@ -4,7 +4,6 @@ import useAuthStore from '@store/authStore';
 
 const BASE_URL = 'https://pjsofttech.in:54443';
 
-// Create axios instance
 const api = axios.create({
   baseURL: BASE_URL,
   timeout: 10000,
@@ -31,6 +30,7 @@ api.interceptors.response.use(
   error => {
     const status = error.response?.status;
     const serverMessage = error.response?.data?.message;
+    const isLoginRequest = error.config?.url?.includes('Login');
 
     // Use server message if available
     if (serverMessage) {
@@ -38,28 +38,39 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Fallback to status based messages
     switch (status) {
       case 400:
         error.message = 'Invalid request. Please check your details.';
         break;
+
       case 401:
-        error.message = 'Invalid email or password. Please try again.';
-        clearSession();
-        useAuthStore.getState().logout();
+        if (isLoginRequest) {
+          // Wrong credentials during login
+          error.message = 'Invalid email or password. Please try again.';
+        } else {
+          // JWT expired on an authenticated request
+          error.message = 'Session expired. Please login again.';
+          clearSession();
+          useAuthStore.getState().logout();
+        }
         break;
+
       case 403:
         error.message = 'Access denied. Contact your administrator.';
         break;
+
       case 404:
         error.message = 'Account not found. Please check your email.';
         break;
+
       case 500:
         error.message = 'Server error. Please try again later.';
         break;
+
       case 503:
         error.message = 'Service unavailable. Please try again later.';
         break;
+
       default:
         if (!error.response) {
           error.message = 'Network error. Please check your connection.';

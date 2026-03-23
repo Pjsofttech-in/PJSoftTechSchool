@@ -6,9 +6,11 @@ let sessionCache = {token: null, user: null, role: null};
 // Save session
 export const saveSession = async (token, user, role) => {
   sessionCache = {token, user, role};
-  await AsyncStorage.setItem('token', token);
-  await AsyncStorage.setItem('user', JSON.stringify(user));
-  await AsyncStorage.setItem('role', role);
+  await AsyncStorage.multiSet([
+    ['token', token],
+    ['user', JSON.stringify(user)],
+    ['role', role],
+  ]);
 };
 
 // Get session SYNC (used by axios interceptor)
@@ -30,12 +32,15 @@ export const getSessionAsync = async () => {
   }
 };
 
+// Restore in-memory cache on app start (called by initAuth)
+export const restoreSession = (token, user, role) => {
+  sessionCache = {token, user, role};
+};
+
 // Clear session
 export const clearSession = async () => {
   sessionCache = {token: null, user: null, role: null};
-  await AsyncStorage.removeItem('token');
-  await AsyncStorage.removeItem('user');
-  await AsyncStorage.removeItem('role');
+  await AsyncStorage.multiRemove(['token', 'user', 'role']);
 };
 
 // Check if logged in

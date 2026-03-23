@@ -1,26 +1,20 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useCallback} from 'react';
 import {View, Text, StyleSheet, StatusBar} from 'react-native';
 import useAuthStore from '@store/authStore';
 
 const SplashScreen = ({navigation}) => {
-  const {initAuth, isAuthenticated, role} = useAuthStore();
+  const init = useCallback(() => {
+    setTimeout(() => {
+      const {isAuthenticated} = useAuthStore.getState();
+      if (!isAuthenticated) {
+        navigation.replace('RoleSelect');
+      }
+    }, 2000);
+  }, [navigation]);
 
   useEffect(() => {
     init();
-  }, []);
-
-  const init = async () => {
-    await initAuth();
-  };
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      // go to role select
-      setTimeout(() => {
-        navigation.replace('RoleSelect');
-      }, 2000);
-    }
-  }, [isAuthenticated]);
+  }, [init]);
 
   return (
     <View style={styles.container}>
