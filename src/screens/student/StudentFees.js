@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
+import { useNavigation } from '@react-navigation/native';
 
 // Theme
 const PRIMARY = '#7b68ee';
@@ -252,6 +253,7 @@ const StudentFees = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const navigation = useNavigation();
 
   const fetchFees = useCallback(async () => {
     try {
@@ -329,6 +331,18 @@ const StudentFees = () => {
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
 
+      {/* Header Section */}
+      <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            activeOpacity={0.8}
+            >
+              <MatIcon name="arrow-left" size={22} color={PRIMARY} />
+          </TouchableOpacity>
+            <Text style={styles.headerTitle}>Fees Details</Text>
+      </View>
+
       {/* Overall Summary Strip */}
       <View style={styles.overallCard}>
         <View style={styles.summaryItem}>
@@ -379,6 +393,10 @@ const StudentFees = () => {
 // Styles
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: GREY_1},
+  // Header
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: WHITE, gap: 8, },
+  backBtn: { padding: 4, borderRadius: 8, backgroundColor: PRIMARY_LIGHT },
+  headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
   // Overall summary card
   overallCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
   // Summary items
