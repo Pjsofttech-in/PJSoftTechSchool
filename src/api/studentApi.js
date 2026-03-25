@@ -74,4 +74,25 @@ export const studentApi = {
       throw new Error(message);
     }
   },
+
+  // Get student results by academic year
+  getStudentResults: async (studentId, role, email) => {
+    try {
+      if (!studentId || !role || !email) {
+        throw new Error('User credentials are missing.');
+      }
+      const response = await api.get('/getResultByStudentAndAcademicYear', {
+        params: {studentId, role, email},
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch student results.';
+      console.error(`[StudentApi] getStudentResults failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+ 
 };
