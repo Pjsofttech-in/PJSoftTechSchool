@@ -1,20 +1,11 @@
 import React, {useEffect, useState, useCallback, useRef} from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StatusBar,
-  RefreshControl,
-  Animated,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Animated, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
+import { useNavigation } from '@react-navigation/native';
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
+// Theme
 const PRIMARY = '#7b68ee';
 const PRIMARY_LIGHT = '#ede9ff';
 const PRIMARY_DARK = '#5a4fcf';
@@ -29,7 +20,7 @@ const RED = '#ef4444';
 const ORANGE = '#f97316';
 const BLUE = '#3b82f6';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// Helpers
 const getGrade = pct => {
   if (pct >= 90) return {grade: 'A+', color: GREEN};
   if (pct >= 80) return {grade: 'A', color: GREEN};
@@ -60,7 +51,7 @@ const getExamTypeColor = type => {
   }
 };
 
-// ─── Animated Progress Bar ────────────────────────────────────────────────────
+// Animated Progress Bar 
 const ProgressBar = ({pct, color, index}) => {
   const animatedWidth = useRef(new Animated.Value(0)).current;
 
@@ -88,7 +79,7 @@ const ProgressBar = ({pct, color, index}) => {
   );
 };
 
-// ─── Subject Row ──────────────────────────────────────────────────────────────
+// Subject Row
 const SubjectRow = ({subject}) => {
   const s = getStatusStyle(subject.status);
   const pct = subject.maxMarks > 0
@@ -119,7 +110,7 @@ const SubjectRow = ({subject}) => {
   );
 };
 
-// ─── Result Card ──────────────────────────────────────────────────────────────
+// Result Card
 const ResultCard = ({result, index}) => {
   const [open, setOpen] = useState(false);
   const s = getStatusStyle(result.overAllStatus);
@@ -129,18 +120,18 @@ const ResultCard = ({result, index}) => {
   return (
     <View style={styles.resultCard}>
 
-      {/* ── Card Header ── */}
+      {/* Card Header */}
       <TouchableOpacity
         activeOpacity={0.85}
         style={styles.resultCardHeader}
         onPress={() => setOpen(o => !o)}>
 
-        {/* Left — grade circle */}
+        {/* Left  grade circle */}
         <View style={[styles.gradeCircle, {borderColor: g.color}]}>
           <Text style={[styles.gradeCircleText, {color: g.color}]}>{g.grade}</Text>
         </View>
 
-        {/* Middle — exam info */}
+        {/* Middle  exam info */}
         <View style={styles.resultCardMid}>
           <Text style={styles.examName} numberOfLines={1}>
             {result.examName?.trim()}
@@ -176,13 +167,13 @@ const ResultCard = ({result, index}) => {
         </View>
       </TouchableOpacity>
 
-      {/* ── Progress bar ── */}
+      {/* Progress bar */}
       <View style={styles.progressWrap}>
         <ProgressBar pct={result.percentage} color={g.color} index={index} />
         <Text style={styles.progressPct}>{result.percentage?.toFixed(0)}%</Text>
       </View>
 
-      {/* ── Subject details — collapsed by default ── */}
+      {/* Subject details collapsed by default */}
       {open && (
         <View style={styles.subjectList}>
           <View style={styles.subjectHeader}>
@@ -199,13 +190,14 @@ const ResultCard = ({result, index}) => {
   );
 };
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// Main Screen 
 const StudentResult = () => {
   const {user} = useAuthStore();
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const navigation = useNavigation();
 
   const fetchResults = useCallback(async () => {
     try {
@@ -235,7 +227,7 @@ const StudentResult = () => {
     fetchResults();
   };
 
-  // ── Overall summary ──
+  // Overall summary 
   const totalExams = results.length;
   const passedExams = results.filter(
     r => r.overAllStatus?.toLowerCase() === 'pass',
@@ -251,7 +243,7 @@ const StudentResult = () => {
       ? Math.max(...results.map(r => r.percentage ?? 0)).toFixed(1)
       : '0';
 
-  // ── Loading ──
+  // Loading
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -262,7 +254,7 @@ const StudentResult = () => {
     );
   }
 
-  // ── Error ──
+  // Error
   if (error) {
     return (
       <View style={styles.centered}>
@@ -276,7 +268,7 @@ const StudentResult = () => {
     );
   }
 
-  // ── No data ──
+  // No data
   if (!loading && !refreshing && results.length === 0) {
     return (
       <View style={styles.centered}>
@@ -294,7 +286,19 @@ const StudentResult = () => {
     <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
 
-      {/* ── Summary Strip ── */}
+      {/** Header Section */}
+      <View style={styles.header}>
+        <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={styles.backBtn}
+        activeOpacity={0.8}
+        >
+          <MatIcon name="arrow-left" size={22} color={PRIMARY} />
+        </TouchableOpacity>
+          <Text style={styles.headerTitle}>Academic Results</Text>
+      </View>
+
+      {/* Summary Strip */}
       <View style={styles.summaryCard}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryVal}>{totalExams}</Text>
@@ -319,7 +323,7 @@ const StudentResult = () => {
         </View>
       </View>
 
-      {/* ── Result list ── */}
+      {/* Result list */}
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -340,257 +344,64 @@ const StudentResult = () => {
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// Styles 
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: GREY_1},
-
+  screen: { flex: 1, backgroundColor: GREY_1 },
+  // Header
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: WHITE, gap: 8, },
+  backBtn: { padding: 4, borderRadius: 8, backgroundColor: PRIMARY_LIGHT },
+  headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
   // Summary strip
-  summaryCard: {
-    flexDirection: 'row',
-    backgroundColor: PRIMARY,
-    paddingVertical: 14,
-    paddingHorizontal: 8,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    elevation: 6,
-    shadowColor: PRIMARY_DARK,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  summaryItem: {flex: 1, alignItems: 'center'},
-  summaryVal: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: WHITE,
-    lineHeight: 20,
-  },
-  summaryLabel: {
-    fontSize: 10,
-    fontFamily: 'Poppins-Regular',
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: 1,
-  },
-  summaryDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginVertical: 4,
-  },
-
+  summaryCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, }, 
+  summaryItem: { flex: 1, alignItems: 'center'},
+  summaryVal: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 20, },
+  summaryLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
+  summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4, },
   // Scroll
-  scroll: {padding: 12, paddingTop: 14},
-
+  scroll: { padding: 12, paddingTop: 14 },
   // Result card
-  resultCard: {
-    backgroundColor: WHITE,
-    borderRadius: 14,
-    marginBottom: 10,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: PRIMARY,
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  resultCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    paddingBottom: 8,
-    gap: 10,
-  },
-
+  resultCard: { backgroundColor: WHITE, borderRadius: 14, marginBottom: 10, overflow: 'hidden', elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 4, },
+  resultCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingBottom: 8, gap: 10, },
   // Grade circle
-  gradeCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: GREY_1,
-  },
-  gradeCircleText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-SemiBold',
-  },
-
+  gradeCircle: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
+  gradeCircleText: { fontSize: 13, fontFamily: 'Poppins-SemiBold', },
   // Card middle
-  resultCardMid: {flex: 1},
-  examName: {
-    fontSize: 13,
-    fontFamily: 'Poppins-SemiBold',
-    color: TEXT_DARK,
-    marginBottom: 3,
-  },
-  examMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  examTypeBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  examTypeText: {
-    fontSize: 10,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  examMarks: {
-    fontSize: 11,
-    fontFamily: 'Poppins-Regular',
-    color: TEXT_LIGHT,
-  },
-
+  resultCardMid: { flex: 1},
+  examName: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 3, },
+  examMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, },
+  examTypeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, },
+  examTypeText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', },
+  examMarks: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
   // Card right
-  resultCardRight: {
-    alignItems: 'center',
-    gap: 3,
-  },
-  pctText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    lineHeight: 18,
-  },
-  statusBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 10,
-    fontFamily: 'Poppins-SemiBold',
-  },
-
-  // Progress bar
-  progressWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    gap: 8,
-  },
-  progressBg: {
-    flex: 1,
-    height: 5,
-    backgroundColor: GREY_2,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  progressPct: {
-    fontSize: 10,
-    fontFamily: 'Poppins-SemiBold',
-    color: TEXT_MID,
-    minWidth: 28,
-    textAlign: 'right',
-  },
-
+  resultCardRight: { alignItems: 'center', gap: 3, },
+  pctText: { fontSize: 14, fontFamily: 'Poppins-SemiBold', lineHeight: 18, },
+  statusBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, },
+  statusText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', },
+  // Progress bar 
+  progressWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10, gap: 8, },
+  progressBg: { flex: 1, height: 5, backgroundColor: GREY_2, borderRadius: 3, overflow: 'hidden', },
+  progressFill: { height: '100%', borderRadius: 3, },
+  progressPct: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: TEXT_MID, minWidth: 28, textAlign: 'right', },
   // Subject list
-  subjectList: {
-    borderTopWidth: 0.5,
-    borderTopColor: GREY_2,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: GREY_1,
-  },
-  subjectHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingBottom: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GREY_2,
-    marginBottom: 4,
-  },
-  subjectHeaderText: {
-    fontSize: 10,
-    fontFamily: 'Poppins-SemiBold',
-    color: TEXT_LIGHT,
-    flex: 1,
-    textAlign: 'center',
-  },
-  subjectRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 5,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GREY_2,
-  },
-  subjectInfo: {flex: 1.5},
-  subjectName: {
-    fontSize: 12,
-    fontFamily: 'Poppins-SemiBold',
-    color: TEXT_DARK,
-  },
-  subjectMarks: {
-    fontSize: 10,
-    fontFamily: 'Poppins-Regular',
-    color: TEXT_MID,
-    marginTop: 1,
-  },
-  subjectPassing: {
-    color: TEXT_LIGHT,
-    fontSize: 10,
-  },
-  subjectRight: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 6,
-  },
-  gradeText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  miniStatusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  miniStatusText: {
-    fontSize: 9,
-    fontFamily: 'Poppins-SemiBold',
-  },
-
+  subjectList: { borderTopWidth: 0.5, borderTopColor: GREY_2, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: GREY_1, },
+  subjectHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: GREY_2, marginBottom: 4, },
+  subjectHeaderText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: TEXT_LIGHT, flex: 1, textAlign: 'center', },
+  subjectRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, borderBottomWidth: 0.5, borderBottomColor: GREY_2, },
+  subjectInfo: { flex: 1.5 }, 
+  subjectName: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
+  subjectMarks: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 1, },
+  subjectPassing: { color: TEXT_LIGHT, fontSize: 10, },
+  subjectRight: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, },
+  gradeText: { fontSize: 13, fontFamily: 'Poppins-SemiBold', },
+  miniStatusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, },
+  miniStatusText: { fontSize: 9, fontFamily: 'Poppins-SemiBold', },
   // Loading / Error
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: GREY_1,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: TEXT_MID,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 13,
-  },
-  errorText: {
-    color: TEXT_MID,
-    fontFamily: 'Poppins-Regular',
-    fontSize: 13,
-    textAlign: 'center',
-    marginHorizontal: 32,
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  retryBtn: {
-    backgroundColor: PRIMARY,
-    paddingHorizontal: 28,
-    paddingVertical: 9,
-    borderRadius: 20,
-  },
-  retryText: {
-    color: WHITE,
-    fontFamily: 'Poppins-SemiBold',
-    fontSize: 13,
-  },
-  bottomPad: {height: 20},
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
+  loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
+  errorText: { color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 12, marginBottom: 16, },
+  retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 9, borderRadius: 20, },
+  retryText: { color: WHITE, fontFamily: 'Poppins-SemiBold', fontSize: 13, },
+  bottomPad: { height: 20 }, 
 });
 
 export default StudentResult;
