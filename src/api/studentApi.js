@@ -95,4 +95,25 @@ export const studentApi = {
     }
   },
  
+  // Get assignments by classroom
+  // Uses classRoomId from user store user.classRoomId
+  getAssignments: async (classRoomId, role, email) => {
+    try {
+      if (!classRoomId || !role || !email) {
+        throw new Error('User credentials are missing.');
+      }
+      const response = await api.get(`/getAssignmentByClassroom/${classRoomId}`, {
+        params: {role, email},
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch assignments.';
+      console.error(`[StudentApi] getAssignments failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+  
 };
