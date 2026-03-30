@@ -116,4 +116,36 @@ export const studentApi = {
     }
   },
   
+  // Submit assignment by student
+  submitAssignment: async (role, email, assignmentId, studentId, remarks, fileUrl = '') =>{
+    try {
+      if (!role || !email || !assignmentId || !studentId) {
+        throw new Error('Required fields are missing.');
+      }
+      const response = await api.post(
+        '/submitAssignmentByStudent',
+        {
+          submission: JSON.stringify({
+            remarks,
+            fileUrl,
+            student: {id: String(studentId)},
+            assignment: {id: assignmentId},
+          }),
+        },
+        {
+          params: {role, email},
+          headers: {'Content-Type': 'multipart/form-data'},
+        },
+      );
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to submit assignment.';
+      console.error(`[StudentApi] submitAssignment failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+   
 };

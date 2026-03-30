@@ -1,5 +1,5 @@
 import React, {useEffect, useState, useCallback} from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Image, Modal, } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Image, Modal, TextInput, KeyboardAvoidingView, Platform, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
@@ -19,7 +19,6 @@ const RED = '#ef4444';
 const ORANGE = '#f97316';
 
 // Helpers
-// Format 'YYYY-MM-DD' to 'DD MMM YYYY'
 const formatDisplay = dateStr => {
   if (!dateStr) return '—';
   const [y, m, d] = dateStr.split('-');
@@ -30,7 +29,6 @@ const formatDisplay = dateStr => {
   return `${d} ${months[parseInt(m) - 1]} ${y}`;
 };
 
-// Days remaining from today
 const getDaysInfo = dueDateStr => {
   if (!dueDateStr) return null;
   const today = new Date();
@@ -47,9 +45,124 @@ const getDaysInfo = dueDateStr => {
   return {label: `${diff}d left`, color: GREEN, bg: '#dcfce7'};
 };
 
+// Submit Modal
+const SubmitModal = ({
+  visible,
+  assignment,
+  onClose,
+  onSubmit,
+  submitting,
+  submitError,
+}) => {
+  const [remarks, setRemarks] = useState('');
+  const [fileUrl, setFileUrl] = useState('');
+
+  const handleSubmit = () => {
+    if (!remarks.trim()) return;
+    onSubmit(assignment?.id, remarks.trim(), fileUrl.trim());
+  };
+
+  const handleClose = () => {
+    setRemarks('');
+    setFileUrl('');
+    onClose();
+  };
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={handleClose}>
+      {/* Platform-conditional behavior for KeyboardAvoidingView */}
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={styles.submitModal}>
+
+          {/* Header */}
+          <View style={styles.submitModalHeader}>
+            <View style={styles.submitModalHeaderLeft}>
+              <MatIcon name="send-outline" size={18} color={PRIMARY} />
+              <Text style={styles.submitModalTitle}>Submit Assignment</Text>
+            </View>
+            <TouchableOpacity onPress={handleClose} disabled={submitting}>
+              <MatIcon name="close" size={22} color={TEXT_MID} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Assignment name */}
+          {assignment && (
+            <View style={styles.submitAssignmentName}>
+              <MatIcon name="clipboard-text-outline" size={14} color={PRIMARY} />
+              <Text style={styles.submitAssignmentNameText} numberOfLines={2}>
+                {assignment.assignmentTitle}
+              </Text>
+            </View>
+          )}
+
+          {/* Error banner */}
+          {submitError && (
+            <View style={styles.submitErrorBanner}>
+              <MatIcon name="alert-circle-outline" size={14} color={RED} />
+              <Text style={styles.submitErrorText}>{submitError}</Text>
+            </View>
+          )}
+
+          {/* Remarks input */}
+          <Text style={styles.inputLabel}>Remarks *</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Enter your remarks..."
+            placeholderTextColor={TEXT_LIGHT}
+            value={remarks}
+            onChangeText={setRemarks}
+            multiline
+            numberOfLines={3}
+            editable={!submitting}
+          />
+
+          {/* File URL input */}
+          <Text style={styles.inputLabel}>File URL (optional)</Text>
+          <TextInput
+            style={[styles.textInput, styles.textInputSingle]}
+            placeholder="Paste file/drive link here..."
+            placeholderTextColor={TEXT_LIGHT}
+            value={fileUrl}
+            onChangeText={setFileUrl}
+            autoCapitalize="none"
+            editable={!submitting}
+          />
+
+          {/* Submit button */}
+          <TouchableOpacity
+            style={[
+              styles.submitBtn,
+              (!remarks.trim() || submitting) && styles.submitBtnDisabled,
+            ]}
+            onPress={handleSubmit}
+            disabled={!remarks.trim() || submitting}
+            activeOpacity={0.85}>
+            {submitting ? (
+              <ActivityIndicator size="small" color={WHITE} />
+            ) : (
+              <>
+                <MatIcon name="send" size={16} color={WHITE} />
+                <Text style={styles.submitBtnText}>Submit</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+};
+
 // Assignment Card
-const AssignmentCard = ({item, onImagePress}) => {
+// Added `submitted` prop to show submitted state on card
+const AssignmentCard = ({item, onImagePress, onSubmitPress}) => {
   const daysInfo = getDaysInfo(item.dueDate);
+  const isSubmitted = !!item.submitted;
 
   return (
     <View style={styles.card}>
@@ -86,8 +199,6 @@ const AssignmentCard = ({item, onImagePress}) => {
               {item.description}
             </Text>
           ) : null}
-
-          {/* Dates row */}
           <View style={styles.datesRow}>
             <View style={styles.dateItem}>
               <MatIcon name="calendar-plus" size={11} color={TEXT_LIGHT} />
@@ -109,13 +220,31 @@ const AssignmentCard = ({item, onImagePress}) => {
             {item.createdByEmail}
           </Text>
         </View>
-        {daysInfo && (
-          <View style={[styles.dueBadge, {backgroundColor: daysInfo.bg}]}>
-            <Text style={[styles.dueBadgeText, {color: daysInfo.color}]}>
-              {daysInfo.label}
-            </Text>
-          </View>
-        )}
+        <View style={styles.footerRight}>
+          {daysInfo && (
+            <View style={[styles.dueBadge, {backgroundColor: daysInfo.bg}]}>
+              <Text style={[styles.dueBadgeText, {color: daysInfo.color}]}>
+                {daysInfo.label}
+              </Text>
+            </View>
+          )}
+
+          {/* "Submitted ✓" chip if already submitted, else show Submit */}
+          {isSubmitted ? (
+            <View style={styles.submittedChip}>
+              <MatIcon name="check-circle-outline" size={12} color={GREEN} />
+              <Text style={styles.submittedChipText}>Submitted</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.submitChip}
+              activeOpacity={0.8}
+              onPress={() => onSubmitPress(item)}>
+              <MatIcon name="send-outline" size={12} color={WHITE} />
+              <Text style={styles.submitChipText}>Submit</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -129,6 +258,13 @@ const StudentAssignments = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+
+  // Submit modal states
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [submitModalVisible, setSubmitModalVisible] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -157,20 +293,56 @@ const StudentAssignments = () => {
     fetchAssignments();
   };
 
+  const handleSubmitPress = assignment => {
+    setSelectedAssignment(assignment);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    setSubmitModalVisible(true);
+  };
+
+  const handleSubmit = async (assignmentId, remarks, fileUrl) => {
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+      await studentApi.submitAssignment(
+        user?.role,
+        user?.email,
+        assignmentId,
+        user?.id,
+        remarks,
+        fileUrl,
+      );
+      setSubmitModalVisible(false);
+
+      // Mark assignment as submitted locally so card updates immediately
+      setAssignments(prev =>
+        prev.map(a =>
+          a.id === assignmentId ? {...a, submitted: true} : a,
+        ),
+      );
+
+      // Auto-dismiss success toast after 3 seconds
+      setSubmitSuccess('Assignment submitted successfully!');
+      setTimeout(() => setSubmitSuccess(null), 3000);
+    } catch (e) {
+      console.error('[StudentAssignments] submit error:', e.message);
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Counts
   const totalCount = assignments.length;
-  const overdueCount = assignments.filter(a => {
-    const info = getDaysInfo(a.dueDate);
-    return info?.color === RED;
-  }).length;
-  const dueTodayCount = assignments.filter(a => {
-    const info = getDaysInfo(a.dueDate);
-    return info?.label === 'Due today';
-  }).length;
-  const upcomingCount = assignments.filter(a => {
-    const info = getDaysInfo(a.dueDate);
-    return info?.color === GREEN;
-  }).length;
+  const overdueCount = assignments.filter(
+    a => getDaysInfo(a.dueDate)?.color === RED,
+  ).length;
+  const dueTodayCount = assignments.filter(
+    a => getDaysInfo(a.dueDate)?.label === 'Due today',
+  ).length;
+  const upcomingCount = assignments.filter(
+    a => getDaysInfo(a.dueDate)?.color === GREEN,
+  ).length;
 
   // Loading
   if (loading) {
@@ -186,7 +358,7 @@ const StudentAssignments = () => {
   // Error
   if (error) {
     return (
-      <View style={styles.credential}>
+      <View style={styles.centered}>
         <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
         <MatIcon name="alert-circle-outline" size={48} color={ORANGE} />
         <Text style={styles.errorText}>{error}</Text>
@@ -197,16 +369,16 @@ const StudentAssignments = () => {
     );
   }
 
-  // No data
+  // Improved empty state — no Retry button since fetch succeeded
   if (!loading && !refreshing && assignments.length === 0) {
     return (
       <View style={styles.centered}>
         <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
-        <MatIcon name="clipboard-text-off-outline" size={48} color={GREY_2} />
-        <Text style={styles.errorText}>No assignments found.</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={fetchAssignments}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        <MatIcon name="clipboard-check-outline" size={56} color={GREY_2} />
+        <Text style={styles.emptyTitle}>All caught up!</Text>
+        <Text style={styles.emptySubtext}>
+          No assignments have been posted for your class yet. Check back later.
+        </Text>
       </View>
     );
   }
@@ -244,6 +416,14 @@ const StudentAssignments = () => {
         </View>
       </View>
 
+      {/* Success toast */}
+      {submitSuccess && (
+        <View style={styles.successToast}>
+          <MatIcon name="check-circle-outline" size={16} color={GREEN} />
+          <Text style={styles.successToastText}>{submitSuccess}</Text>
+        </View>
+      )}
+
       {/* Assignment List */}
       <FlatList
         data={assignments}
@@ -252,6 +432,7 @@ const StudentAssignments = () => {
           <AssignmentCard
             item={item}
             onImagePress={uri => setPreviewImage(uri)}
+            onSubmitPress={handleSubmitPress}
           />
         )}
         contentContainerStyle={styles.listContent}
@@ -272,21 +453,34 @@ const StudentAssignments = () => {
         transparent
         animationType="fade"
         onRequestClose={() => setPreviewImage(null)}>
-        <View style={styles.modalOverlay}>
+        <View style={styles.previewOverlay}>
           <TouchableOpacity
-            style={styles.modalClose}
+            style={styles.previewClose}
             onPress={() => setPreviewImage(null)}>
             <MatIcon name="close-circle" size={32} color={WHITE} />
           </TouchableOpacity>
           {previewImage && (
             <Image
               source={{uri: previewImage}}
-              style={styles.modalImage}
+              style={styles.previewImage}
               resizeMode="contain"
             />
           )}
         </View>
       </Modal>
+
+      {/* Submit Modal */}
+      <SubmitModal
+        visible={submitModalVisible}
+        assignment={selectedAssignment}
+        onClose={() => {
+          setSubmitModalVisible(false);
+          setSubmitError(null);
+        }}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+        submitError={submitError}
+      />
     </View>
   );
 };
@@ -298,42 +492,73 @@ const styles = StyleSheet.create({
   summaryCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
   summaryItem: { flex: 1, alignItems: 'center'},
   summaryVal: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 22, },
-  summaryLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
+  summaryLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
   summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4, },
+  // Success toast
+  successToast: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', marginHorizontal: 12, marginTop: 10, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderLeftWidth: 3, borderLeftColor: GREEN, },
+  successToastText: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: GREEN, flex: 1, },
   // List
   listContent: { padding: 12, paddingTop: 14, paddingBottom: 20 },
   // Assignment card
   card: { backgroundColor: WHITE, borderRadius: 14, marginBottom: 10, overflow: 'hidden', elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 4, },
-  cardContent: { flexDirection: 'row', padding: 12, gap: 10, },
+  cardContent: { flexDirection: 'row', padding: 12, gap: 10 },
   // Thumbnail
-  thumbWrap: { width: 70, height: 70, borderRadius: 10, overflow: 'hidden', },
-  thumb: { width: '100%', height: '100%', },
+  thumbWrap: { width: 70, height: 70, borderRadius: 10, overflow: 'hidden'},
+  thumb: { width: '100%', height: '100%'},
   thumbOverlay: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.4)', padding: 3, borderTopLeftRadius: 8, },
   thumbPlaceholder: { backgroundColor: PRIMARY_LIGHT, alignItems: 'center', justifyContent: 'center', },
   // Card info
   cardInfo: { flex: 1},
-  cardTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 3, }, 
-  cardDesc: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginBottom: 5, lineHeight: 16, },
-  // Dates
-  datesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, },
-  dateItem: { flexDirection: 'row', alignItems: 'center', gap: 3, },
-  dateText: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
+  cardTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 3, },
+  cardDesc: { fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginBottom: 5, lineHeight: 16, },
+  datesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  dateItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  // Bumped date/secondary text from 10 → 11 for readability
+  dateText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT },
   // Footer
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 10, paddingTop: 2, borderTopWidth: 0.5, borderTopColor: GREY_2, },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 10, paddingTop: 4, borderTopWidth: 0.5, borderTopColor: GREY_2, },
   teacherRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, marginRight: 8, },
-  teacherText: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, flex: 1, },
-  dueBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, },
-  dueBadgeText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', },
+  // Bumped teacher text from 10 → 11
+  teacherText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, flex: 1, },
+  footerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dueBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  // Bumped badge text from 10 → 11
+  dueBadgeText: { fontSize: 11, fontFamily: 'Poppins-SemiBold'},
+  submitChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, gap: 4, },
+  submitChipText: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: WHITE },
+  // Submitted chip style
+  submittedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: '#bbf7d0', },
+  submittedChipText: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: GREEN },
   // Image preview modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', },
-  modalClose: { position: 'absolute', top: 40, right: 16, zIndex: 10, },
-  modalImage: { width: '95%', height: '80%', borderRadius: 12, },
+  previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', },
+  previewClose: { position: 'absolute', top: 40, right: 16, zIndex: 10 },
+  previewImage: { width: '95%', height: '80%', borderRadius: 12 },
+  // Submit modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', },
+  submitModal: { backgroundColor: WHITE, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, },
+  submitModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, },
+  submitModalHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, },
+  submitModalTitle: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
+  submitAssignmentName: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY_LIGHT, borderRadius: 8, padding: 10, marginBottom: 14, gap: 8, },
+  submitAssignmentNameText: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: PRIMARY_DARK, flex: 1, },
+  // Error banner inside modal
+  submitErrorBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fee2e2', borderRadius: 8, padding: 10, marginBottom: 12, gap: 8, borderLeftWidth: 3, borderLeftColor: RED, },
+  submitErrorText: { fontSize: 12, fontFamily: 'Poppins-Regular', color: RED, flex: 1, },
+  inputLabel: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: TEXT_MID, marginBottom: 6, },
+  textInput: { borderWidth: 1, borderColor: GREY_2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 13, fontFamily: 'Poppins-Regular', color: TEXT_DARK, backgroundColor: GREY_1, marginBottom: 14, minHeight: 80, textAlignVertical: 'top', },
+  textInputSingle: { minHeight: 46 },
+  submitBtn: { backgroundColor: PRIMARY, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8, marginTop: 4, },
+  submitBtnDisabled: { opacity: 0.5 },
+  submitBtnText: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: WHITE, },
   // Loading / Error
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
   loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
   errorText: { color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 12, marginBottom: 16, },
   retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 9, borderRadius: 20, },
-  retryText: { color: WHITE, fontFamily: 'Poppins-SemiBold', fontSize: 13, },
+  retryText: { color: WHITE, fontFamily: 'Poppins-SemiBold', fontSize: 13 },
+  // Empty state styles
+  emptyTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 16, marginBottom: 8, },
+  emptySubtext: { fontSize: 13, fontFamily: 'Poppins-Regular', color: TEXT_MID, textAlign: 'center', marginHorizontal: 40, lineHeight: 20, },
 });
 
 export default StudentAssignments;
