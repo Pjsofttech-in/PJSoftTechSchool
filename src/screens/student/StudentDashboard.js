@@ -322,6 +322,12 @@ const StudentDashboard = () => {
         />
       </View>
 
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Software Designed By PJSOFTTECH Pvt. Ltd.</Text>
+        <Text style={styles.footerCopyright}>© All Rights Reserved</Text>
+      </View>
+
       <View style={styles.bottomPad} />
     </ScrollView>
   );
@@ -369,6 +375,11 @@ const styles = StyleSheet.create({
   statIconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8, },
   statVal: { fontSize: 20, fontFamily: 'Poppins-SemiBold', lineHeight: 26,  },
   statLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 2, },
+  // Footer
+  footer: { alignItems: 'center', marginTop: 20, },
+  footerText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, },
+  footerCopyright: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginTop: 3, },
+  // BottomPad
   bottomPad: { height: 20 },
 });
 
