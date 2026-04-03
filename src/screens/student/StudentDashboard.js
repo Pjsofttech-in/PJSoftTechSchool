@@ -1,5 +1,5 @@
 import React, {useEffect, useState, useCallback} from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Linking } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import {useNavigation} from '@react-navigation/native';
 import useAuthStore from '@store/authStore';
@@ -324,7 +324,9 @@ const StudentDashboard = () => {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Software Designed By PJSOFTTECH Pvt. Ltd.</Text>
+        <TouchableOpacity onPress={() => Linking.openURL('https://pjsofttech.com')}>
+          <Text style={styles.footerText}>Software Designed By PJSOFTTECH Pvt. Ltd.</Text>
+        </TouchableOpacity>
         <Text style={styles.footerCopyright}>© All Rights Reserved</Text>
       </View>
 
@@ -377,7 +379,7 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 2, },
   // Footer
   footer: { alignItems: 'center', marginTop: 20, },
-  footerText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, },
+  footerText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: PRIMARY, textDecorationLine: 'underline', },
   footerCopyright: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginTop: 3, },
   // BottomPad
   bottomPad: { height: 20 },
