@@ -28,4 +28,20 @@ export const teacherApi = {
       throw new Error(message);
     }
   },
+
+  // Get all ClassRooms
+  getClassRooms: async (id, email) => {
+  try {
+    const response = await api.get(`/getClassRoomByTeacherId/${id}`, {
+      params: { 
+        role: 'teacher', 
+        email: email 
+      },
+    });
+    return response.data; // This is an array []
+  } catch (error) {
+    console.error('[TeacherApi] getClassRooms failed:', error.message);
+    throw error;
+  }
+},
 };
