@@ -44,4 +44,22 @@ export const teacherApi = {
     throw error;
   }
 },
+
+// Get Attendance by Class
+getAttendanceByClass: async (classroomId, timeFrame = 'today') => {
+  try {
+    const response = await api.post(`/getAttendaceByClassroom`, null, {
+      params: {
+        classroomId: classroomId,
+        timeFrame: timeFrame,
+        page: 0,
+        size: 500, // Increased size to show more students at once
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('[TeacherApi] getAttendanceByClass failed:', error.message);
+    throw error;
+  }
+},
 };
