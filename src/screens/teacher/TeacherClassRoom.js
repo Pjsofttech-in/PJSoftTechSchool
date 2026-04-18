@@ -1,9 +1,10 @@
 import React, { Component } from 'react';
-import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView } from 'react-native';
+import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, Modal, Dimensions } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
 
 export class TeacherClassRoom extends Component {
@@ -11,7 +12,11 @@ export class TeacherClassRoom extends Component {
     super(props);
     this.state = {
       classrooms: [],
+      students: [],
       loading: true,
+      modalLoading: false,
+      isModalVisible: false,
+      selectedClassName: ''
     };
   }
 
@@ -25,12 +30,28 @@ export class TeacherClassRoom extends Component {
       const data = await teacherApi.getClassRooms(user.id, user.email);
       this.setState({ classrooms: data, loading: false });
     } catch (err) {
-      console.error('[ClassRoomHub] Fetch Error:', err);
       this.setState({ loading: false });
     }
   };
 
-  // Helper to render the small action buttons
+  fetchStudents = async (classId, className) => {
+    this.setState({ 
+      isModalVisible: true, 
+      modalLoading: true, 
+      selectedClassName: className,
+      students: [] 
+    });
+
+    try {
+      const { user } = useAuthStore.getState();
+      const data = await teacherApi.getStudentsByClass(user.email, classId);
+      this.setState({ students: data, modalLoading: false });
+    } catch (err) {
+      console.error('Fetch Students Error:', err);
+      this.setState({ modalLoading: false });
+    }
+  };
+
   renderActionButton = (icon, label, color, onPress) => (
     <TouchableOpacity style={[styles.actionBtn, { borderColor: color }]} onPress={onPress}>
       <MatIcon name={icon} size={20} color={color} />
@@ -40,7 +61,6 @@ export class TeacherClassRoom extends Component {
 
   renderClassItem = ({ item }) => (
     <View style={styles.card}>
-      {/* Top Section: Class Identity */}
       <View style={styles.cardHeader}>
         <View style={styles.standardCircle}>
           <Text style={styles.standardText}>{item.standard}</Text>
@@ -50,19 +70,39 @@ export class TeacherClassRoom extends Component {
           <Text style={styles.subTitle}>{item.startTime} - {item.endTime}</Text>
         </View>
         <View style={styles.branchBadge}>
-            <Text style={styles.branchText}>{item.branchCode}</Text>
+          <Text style={styles.branchText}>{item.branchCode}</Text>
         </View>
       </View>
-
       <View style={styles.divider} />
-
-      {/* Bottom Section: 2x2 Action Grid */}
       <View style={styles.grid}>
-        {this.renderActionButton('numeric-positive-1', 'Marks', '#FF6B6B', () => console.log('Marks', item.id))}
-        {this.renderActionButton('calendar-clock', 'Schedule', '#4ECDC4', () => console.log('Schedule', item.id))}
-        {this.renderActionButton('account-group', 'Students', '#45B7D1', () => console.log('Students', item.id))}
-        {this.renderActionButton('clipboard-check', 'Attendance', '#7b68ee', () => console.log('Attendance', item.id))}
+        {this.renderActionButton('numeric-positive-1', 'Marks', '#FF6B6B', () => {})}
+        {this.renderActionButton('calendar-clock', 'Schedule', '#4ECDC4', () => {})}
+        {this.renderActionButton('account-group', 'Students', PRIMARY, () => 
+          this.fetchStudents(item.id, `${item.standard}-${item.division}`)
+        )}
       </View>
+    </View>
+  );
+
+  renderStudentItem = ({ item }) => (
+    <View style={styles.studentItem}>
+      <View style={styles.studentAvatar}>
+        <Text style={styles.avatarText}>{item.fullName.charAt(0)}</Text>
+      </View>
+      <View style={styles.studentInfo}>
+        <Text style={styles.studentName}>{item.fullName}</Text>
+        <Text style={styles.studentSub}>Roll No: {item.rollNo} • {item.gender}</Text>
+      </View>
+      <TouchableOpacity onPress={() => console.log('Call', item.contact)}>
+        <MatIcon name="phone-outline" size={22} color="#4caf50" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  renderEmptyStudents = () => (
+    <View style={styles.emptyContainer}>
+      <MatIcon name="account-search-outline" size={80} color="#ccc" />
+      <Text style={styles.emptyText}>No students found in this class</Text>
     </View>
   );
 
@@ -84,6 +124,37 @@ export class TeacherClassRoom extends Component {
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.list}
         />
+
+        {/* Student List Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={this.state.isModalVisible}
+          onRequestClose={() => this.setState({ isModalVisible: false })}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Students: {this.state.selectedClassName}</Text>
+                <TouchableOpacity onPress={() => this.setState({ isModalVisible: false })}>
+                  <MatIcon name="close-circle" size={28} color="#ccc" />
+                </TouchableOpacity>
+              </View>
+
+              {this.state.modalLoading ? (
+                <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 50 }} />
+              ) : (
+                <FlatList
+                  data={this.state.students}
+                  renderItem={this.renderStudentItem}
+                  ListEmptyComponent={this.renderEmptyStudents}
+                  keyExtractor={(item) => item.id.toString()}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     );
   }
@@ -107,17 +178,21 @@ const styles = StyleSheet.create({
   branchText: { fontSize: 10, color: '#999', fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 15 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 },
-  actionBtn: { 
-    width: '48%', 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    padding: 10, 
-    borderRadius: 12, 
-    borderWidth: 1,
-    gap: 8,
-    backgroundColor: '#fff' 
-  },
-  actionLabel: { fontSize: 12, fontWeight: '600' }
+  actionBtn: { width: '48%', flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, gap: 8, backgroundColor: '#fff' },
+  actionLabel: { fontSize: 12, fontWeight: '600' },
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 25, borderTopRightRadius: 25, height: SCREEN_HEIGHT * 0.8, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a2e' },
+  studentItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', padding: 12, borderRadius: 15, marginBottom: 10 },
+  studentAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { color: '#fff', fontWeight: 'bold' },
+  studentInfo: { flex: 1, marginLeft: 12 },
+  studentName: { fontSize: 14, fontWeight: 'bold', color: '#1a1a2e' },
+  studentSub: { fontSize: 11, color: '#777' },
+  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyText: { marginTop: 10, color: '#999', fontSize: 16 }
 });
 
 export default TeacherClassRoom;

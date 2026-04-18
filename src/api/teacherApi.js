@@ -62,4 +62,16 @@ getAttendanceByClass: async (classroomId, timeFrame = 'today') => {
     throw error;
   }
 },
+
+// Get Students by classRoomId to list particular class students
+getStudentsByClass: async (email, classRoomId) => {
+  const response = await api.get(`/getStudentByClassRoomId`, {
+    params: {
+      role: 'teacher',
+      email: email,
+      classRoomId: classRoomId
+    }
+  });
+  return response.data;
+}
 };
