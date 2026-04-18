@@ -73,5 +73,17 @@ getStudentsByClass: async (email, classRoomId) => {
     }
   });
   return response.data;
-}
+},
+
+// Get Time-Table for particular class room
+getTimeTableByClassId: async (email, classId) => {
+  const response = await api.get(`/getTimeTableByClassId`, {
+    params: {
+      role: 'teacher',
+      email: email,
+      classId: classId
+    }
+  });
+  return response.data;
+},
 };
