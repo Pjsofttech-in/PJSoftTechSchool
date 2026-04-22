@@ -36,7 +36,6 @@ export class TeacherAssignments extends Component {
     }
   };
 
-  // Logic for the View All button
   fetchAssignments = async (classId, className) => {
     this.setState({ 
       isViewModalVisible: true, 
@@ -46,7 +45,6 @@ export class TeacherAssignments extends Component {
     });
     try {
       const { user } = useAuthStore.getState();
-      // API call using classId and user email
       const data = await teacherApi.getAssignmentsByClass(user.email, classId);
       this.setState({ assignments: data, modalLoading: false });
     } catch (err) {
@@ -71,13 +69,24 @@ export class TeacherAssignments extends Component {
         </View>
       </View>
       
-      {/* Small Edit Button */}
-      <TouchableOpacity 
-        style={styles.editSmallBtn} 
-        onPress={() => console.log('Edit', item.id)}
-      >
-        <MatIcon name="pencil-outline" size={18} color={PRIMARY} />
-      </TouchableOpacity>
+      {/* Action Buttons Container */}
+      <View style={styles.actionBtnGroup}>
+        {/* View Submissions Button */}
+        <TouchableOpacity 
+          style={[styles.editSmallBtn, { marginBottom: 8 }]} 
+          onPress={() => console.log('View Submissions for', item.id)}
+        >
+          <MatIcon name="account-details-outline" size={18} color={PRIMARY} />
+        </TouchableOpacity>
+
+        {/* Edit Button */}
+        <TouchableOpacity 
+          style={styles.editSmallBtn} 
+          onPress={() => console.log('Edit Assignment', item.id)}
+        >
+          <MatIcon name="pencil-outline" size={18} color={PRIMARY} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -227,7 +236,6 @@ const styles = StyleSheet.create({
   viewBtnText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
   addBtn: { backgroundColor: PRIMARY },
   addBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  // Modal & List Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 25, borderTopRightRadius: 25, height: SCREEN_HEIGHT * 0.8, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -239,8 +247,8 @@ const styles = StyleSheet.create({
   assignmentDesc: { fontSize: 12, color: '#777', marginVertical: 2 },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dateText: { fontSize: 11, color: '#888' },
+  actionBtnGroup: { marginLeft: 10, alignItems: 'center' },
   editSmallBtn: { width: 35, height: 35, borderRadius: 10, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
-  // Full Preview Styles
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
   previewClose: { position: 'absolute', top: 50, right: 25, zIndex: 100 },
   scrollViewCentered: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
