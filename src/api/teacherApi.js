@@ -86,4 +86,16 @@ getTimeTableByClassId: async (email, classId) => {
   });
   return response.data;
 },
+
+// Get assignments by classs
+getAssignmentsByClass: async (email, classId) => {
+  const response = await api.get(`/getAssignmentByClassroom/${classId}`, {
+    params: {
+      role: 'teacher',
+      email: email
+    }
+  });
+  return response.data;
+},
+
 };
