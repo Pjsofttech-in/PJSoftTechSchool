@@ -98,4 +98,29 @@ getAssignmentsByClass: async (email, classId) => {
   return response.data;
 },
 
+// Create a new assignment with image upload
+  // API: POST /createAssignment?role=teacher&email=<email>
+  // Body: multipart/form-data  →  assignment (JSON string) + image (binary)
+  createAssignment: async (formData, email) => {
+    try {
+      const response = await api.post(`/createAssignment`, formData, {
+        params: {
+          role: 'teacher',
+          email: email,
+        },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to create assignment.';
+      console.error(`[TeacherApi] createAssignment failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
 };
