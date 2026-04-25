@@ -79,6 +79,7 @@ export class TeacherAssignments extends Component {
       newDate: new Date(),
       selectedImage: null,
       submitAttempted: false,
+      uploading: false,
     });
   };
 
