@@ -89,6 +89,12 @@ const StudentDashboard = () => {
     try {
       const today = formatDate(new Date());
 
+      const student = await studentApi.getStudentById(
+        user?.id,
+        user?.role,
+        user?.email
+      );
+
       const [attendance, fees, results, assignments] = await Promise.allSettled([
         // Today's attendance
         studentApi.getAttendance(user?.id, 'today', today, today, 0, 1),
@@ -97,7 +103,7 @@ const StudentDashboard = () => {
         // Results
         studentApi.getStudentResults(user?.id, user?.role, user?.email),
         // Assignments
-        studentApi.getAssignments(user?.classRoomId, user?.role, user?.email),
+        studentApi.getAssignments(student?.classsRoomId, user?.role, user?.email),
       ]);
 
       // Attendance

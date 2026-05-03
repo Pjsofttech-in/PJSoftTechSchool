@@ -269,8 +269,15 @@ const StudentAssignments = () => {
   const fetchAssignments = useCallback(async () => {
     try {
       setError(null);
+
+      const student = await studentApi.getStudentById(
+        user?.id,
+        user?.role,
+        user?.email
+      );
+      
       const data = await studentApi.getAssignments(
-        user?.classRoomId,
+        student?.classsRoomId,
         user?.role,
         user?.email,
       );
