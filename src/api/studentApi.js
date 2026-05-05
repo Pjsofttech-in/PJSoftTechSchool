@@ -147,5 +147,29 @@ export const studentApi = {
       throw new Error(message);
     }
   },
+
+  // Get timetable for student's classroom
+  getTimeTableByClassId: async (role, email, classId) => {
+    try {
+      if (!role || !email || !classId) {
+        throw new Error('Required fields are missing.');
+      }
+      const response = await api.get('/getTimeTableByClassId', {
+        params: {
+          role: role,
+          email: email,
+          classId: classId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch timetable.';
+      console.error(`[StudentApi] getTimeTableByClassId failed: ${message}`);
+      throw new Error(message);
+    }
+  },
    
 };
