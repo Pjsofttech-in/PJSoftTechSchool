@@ -3,6 +3,7 @@ import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
+import { useNavigation } from '@react-navigation/native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
@@ -218,6 +219,7 @@ export class TeacherResult extends Component {
   // Render
   render() {
     const { classrooms, loading, error } = this.state;
+    const { navigation } = this.props;
 
     // Error state with retry
     if (error) {
@@ -247,9 +249,20 @@ export class TeacherResult extends Component {
     return (
       <SafeAreaView style={styles.container}>
 
+        {/* Appbar */}
+        <View style={styles.appbar}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+            activeOpacity={0.8}
+            >
+              <MatIcon name="arrow-left" size={22} color={PRIMARY} />
+          </TouchableOpacity>
+            <Text style={styles.appbartitle}>Result</Text>
+        </View>
+        
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Select Classroom</Text>
           <Text style={styles.headerSub}>Available classes for result viewing</Text>
         </View>
 
@@ -363,9 +376,13 @@ export class TeacherResult extends Component {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fe' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  header: { padding: 20, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
-  headerSub: { fontSize: 13, color: '#999', marginTop: 4 },
+  //
+  appbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#ffffff', gap: 12, },
+  backBtn: { padding: 4, borderRadius: 8, backgroundColor: '#ede9ff' },
+  appbartitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: '#1a1a2e', },
+  //
+  header: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
+  headerSub: { fontSize: 11, color: '#888', marginTop: 4 },
   listPadding: { padding: 16 },
   // Classroom Card 
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, },
