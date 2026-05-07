@@ -177,7 +177,6 @@ export class TeacherClassRoom extends Component {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.topBar}>
-          <Text style={styles.topBarTitle}>Classroom Management</Text>
           <Text style={styles.topBarSub}>Select a class to manage records</Text>
         </View>
 
@@ -255,9 +254,8 @@ export class TeacherClassRoom extends Component {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f2f7' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  topBar: { padding: 20, backgroundColor: '#fff', borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 2 },
-  topBarTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
-  topBarSub: { fontSize: 13, color: '#888', marginTop: 4 },
+  topBar: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
+  topBarSub: { fontSize: 11, color: '#888', marginTop: 4 },
   list: { padding: 16 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 16, elevation: 4 },
   cardHeader: { flexDirection: 'row', alignItems: 'center' },

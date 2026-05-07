@@ -115,7 +115,6 @@ export class TeacherAttendance extends Component {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.topSection}>
-          <Text style={styles.title}>Attendance Records</Text>
           <Text style={styles.subtitle}>Manage classroom presence and history</Text>
         </View>
 
@@ -223,9 +222,8 @@ export class TeacherAttendance extends Component {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f7ff' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  topSection: { padding: 24, backgroundColor: '#fff', borderBottomLeftRadius: 25, borderBottomRightRadius: 25, elevation: 3 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#1a1a2e' },
-  subtitle: { fontSize: 13, color: '#777', marginTop: 4 },
+  topSection: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
+  subtitle: { fontSize: 11, color: '#888', marginTop: 4 },
   list: { padding: 16 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 16, elevation: 4 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

@@ -238,7 +238,6 @@ export class TeacherAssignments extends Component {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Classroom Assignments</Text>
           <Text style={styles.headerSub}>Manage and track student tasks</Text>
         </View>
 
@@ -451,9 +450,8 @@ export class TeacherAssignments extends Component {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fe' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { padding: 20, backgroundColor: '#fff', elevation: 2 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#1a1a2e' },
-  headerSub: { fontSize: 13, color: '#999', marginTop: 4 },
+  header: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
+  headerSub: { fontSize: 11, color: '#888', marginTop: 4 },
   listContainer: { padding: 16 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 16, elevation: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
