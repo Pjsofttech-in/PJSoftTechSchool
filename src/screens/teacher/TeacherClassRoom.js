@@ -82,7 +82,7 @@ export class TeacherClassRoom extends Component {
 };
 
   renderActionButton = (icon, label, color, onPress) => (
-    <TouchableOpacity style={[styles.actionBtn, { borderColor: color }]} onPress={onPress}>
+    <TouchableOpacity activeOpacity={0.7} style={[styles.actionBtn, { borderColor: color }]} onPress={onPress}>
       <MatIcon name={icon} size={20} color={color} />
       <Text style={[styles.actionLabel, { color: color }]}>{label}</Text>
     </TouchableOpacity>
@@ -107,12 +107,8 @@ export class TeacherClassRoom extends Component {
 
       <View style={styles.grid}>
         {this.renderActionButton('numeric-positive-1', 'Marks', '#FF6B6B', () => console.log('Marks', item.id))}
-        {this.renderActionButton('calendar-clock', 'Schedule', '#4ECDC4', () => 
-          this.fetchTimetable(item.id, `${item.standard} - ${item.division}`)
-        )}
-        {this.renderActionButton('account-group', 'Students', PRIMARY, () => 
-          this.fetchStudents(item.id, `${item.standard} - ${item.division}`)
-        )}
+        {this.renderActionButton('calendar-clock', 'Schedule', '#4ECDC4', () => this.fetchTimetable(item.id, `${item.standard} - ${item.division}`))}
+        {this.renderActionButton('account-group', 'Students', PRIMARY, () => this.fetchStudents(item.id, `${item.standard} - ${item.division}`))}
       </View>
     </View>
   );
@@ -267,9 +263,9 @@ const styles = StyleSheet.create({
   yearBadge: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   yearText: { fontSize: 10, color: '#999', fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 15 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', gap: 10 },
-  actionBtn: { width: '48%', flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, gap: 8, backgroundColor: '#fff' },
-  actionLabel: { fontSize: 12, fontFamily: 'Poppins-Regular' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', },
+  actionBtn: { width: '32%', flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, backgroundColor: '#fff', elevation: 2, },
+  actionLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', marginLeft: 6, },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 25, borderTopRightRadius: 25, height: SCREEN_HEIGHT * 0.8, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
