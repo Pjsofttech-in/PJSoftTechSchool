@@ -30,7 +30,13 @@ export class TeacherAssignments extends Component {
       showDatePicker: false,
       selectedClassId: null,
       selectedImage: null,
-      submitAttempted: false,      
+      submitAttempted: false,
+      // Submissions
+      isSubmissionsModalVisible: false,
+      submissions: [],
+      submissionsLoading: false,
+      submissionsError: null,
+      selectedAssignmentTitle: '',
     };
   }
 
@@ -46,7 +52,6 @@ export class TeacherAssignments extends Component {
       this.setState({ classrooms: data, loading: false });
     } catch (err) {
       console.error('[Assignments] Fetch Error:', err);
-      // set error state instead of silently failing
       this.setState({ loading: false, error: 'Failed to load classrooms. Tap to retry.' });
     }
   };
@@ -65,12 +70,10 @@ export class TeacherAssignments extends Component {
       this.setState({ assignments: data, modalLoading: false });
     } catch (err) {
       console.error('Fetch Assignments Error:', err);
-      // set error state instead of silently failing
       this.setState({ modalLoading: false, assignmentError: 'Failed to load assignments. Please try again.' });
     }
   };
 
-  // reset all form fields when closing add modal
   closeAddModal = () => {
     this.setState({
       isAddModalVisible: false,
@@ -92,16 +95,32 @@ export class TeacherAssignments extends Component {
     });
   };
 
-  // remove selected image
   handleRemoveImage = () => {
     this.setState({ selectedImage: null });
+  };
+
+  fetchSubmissions = async (assignmentId, assignmentTitle) => {
+    this.setState({
+      isSubmissionsModalVisible: true,
+      submissionsLoading: true,
+      submissionsError: null,
+      submissions: [],
+      selectedAssignmentTitle: assignmentTitle,
+    });
+    try {
+      const { user } = useAuthStore.getState();
+      const data = await teacherApi.getSubmissionsByAssignmentId(user.email, assignmentId);
+      this.setState({ submissions: data, submissionsLoading: false });
+    } catch (err) {
+      console.error('Fetch Submissions Error:', err);
+      this.setState({ submissionsLoading: false, submissionsError: 'Failed to load submissions. Please try again.' });
+    }
   };
 
   handlePostAssignment = async () => {
     const { newTitle, newDesc, newDate, selectedClassId, selectedImage } = this.state;
     const { user } = useAuthStore.getState();
 
-    // mark submit attempted so required fields highlight
     this.setState({ submitAttempted: true });
 
     if (!newTitle || !newDesc || !selectedImage) {
@@ -136,7 +155,6 @@ export class TeacherAssignments extends Component {
       // Pass email separately so teacherApi can send it as a query param
       await teacherApi.createAssignment(formData, user.email);
       ToastAndroid.show('Assignment posted successfully!', ToastAndroid.LONG);
-      // use closeAddModal to reset all fields
       this.closeAddModal();
     } catch (err) {
       this.setState({ uploading: false });
@@ -160,10 +178,9 @@ export class TeacherAssignments extends Component {
         </View>
       </View>
       <View style={styles.actionBtnGroup}>
-        {/* buttons show toast until feature is implemented, not console.log */}
         <TouchableOpacity
           style={[styles.editSmallBtn, { marginBottom: 8 }]}
-          onPress={() => ToastAndroid.show('Submissions coming soon', ToastAndroid.SHORT)}
+          onPress={() => this.fetchSubmissions(item.id, item.assignmentTitle)}
         >
           <MatIcon name="account-details-outline" size={18} color={PRIMARY} />
         </TouchableOpacity>
@@ -212,7 +229,6 @@ export class TeacherAssignments extends Component {
   );
 
   render() {
-    // show error + retry on classroom fetch failure
     if (this.state.error) {
       return (
         <View style={styles.centered}>
@@ -266,7 +282,6 @@ export class TeacherAssignments extends Component {
               {this.state.modalLoading ? (
                 <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 50 }} />
               ) : this.state.assignmentError ? (
-                // show error state in assignment modal
                 <View style={styles.emptyBox}>
                   <MatIcon name="alert-circle-outline" size={36} color="#ccc" />
                   <Text style={[styles.emptyText, { marginTop: 8 }]}>{this.state.assignmentError}</Text>
@@ -276,7 +291,6 @@ export class TeacherAssignments extends Component {
                   data={this.state.assignments}
                   renderItem={this.renderAssignmentItem}
                   keyExtractor={(item) => item.id.toString()}
-                  // improved empty state with icon and helpful message
                   ListEmptyComponent={
                     <View style={styles.emptyBox}>
                       <MatIcon name="clipboard-text-outline" size={40} color="#ccc" />
@@ -296,11 +310,9 @@ export class TeacherAssignments extends Component {
           visible={this.state.isAddModalVisible}
           animationType="slide"
           transparent={true}
-          // use closeAddModal to reset state on back press
           onRequestClose={this.closeAddModal}
         >
           <View style={styles.modalOverlay}>
-            {/* KeyboardAvoidingView so keyboard doesn't cover inputs */}
             <KeyboardAvoidingView
               behavior="padding"
               style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.92 }]}
@@ -310,7 +322,6 @@ export class TeacherAssignments extends Component {
                   <Text style={styles.modalTitle}>Create Assignment</Text>
                   <Text style={{ fontSize: 12, color: '#999' }}>Class: {this.state.selectedClassName}</Text>
                 </View>
-                {/* X button also resets form */}
                 <TouchableOpacity onPress={this.closeAddModal}>
                   <MatIcon name="close-circle" size={28} color="#ccc" />
                 </TouchableOpacity>
@@ -321,7 +332,6 @@ export class TeacherAssignments extends Component {
                 keyboardShouldPersistTaps="handled"
                 contentContainerStyle={{ paddingBottom: 40 }}
               >
-                {/* red asterisk on required fields */}
                 <Text style={styles.label}>
                   Assignment Title <Text style={{ color: 'red' }}>*</Text>
                 </Text>
@@ -363,7 +373,6 @@ export class TeacherAssignments extends Component {
                 <Text style={styles.label}>
                   Attachment <Text style={{ color: 'red' }}>*</Text>
                 </Text>
-                {/* taller picker + red border when required + remove button */}
                 <TouchableOpacity
                   style={[
                     styles.imagePickBtn,
@@ -442,6 +451,71 @@ export class TeacherAssignments extends Component {
             </ScrollView>
           </View>
         </Modal>
+
+        {/* Submissions Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={this.state.isSubmissionsModalVisible}
+          onRequestClose={() => this.setState({ isSubmissionsModalVisible: false })}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.85 }]}>
+              <View style={styles.modalHeader}>
+                <View style={{ flex: 1, marginRight: 10 }}>
+                  <Text style={styles.modalTitle}>Submissions</Text>
+                  <Text style={{ fontSize: 12, color: '#999' }} numberOfLines={1}>
+                    {this.state.selectedAssignmentTitle}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => this.setState({ isSubmissionsModalVisible: false })}>
+                  <MatIcon name="close-circle" size={28} color="#ccc" />
+                </TouchableOpacity>
+              </View>
+
+              {this.state.submissionsLoading ? (
+                <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 50, marginBottom: 50 }} />
+              ) : this.state.submissionsError ? (
+                <View style={styles.emptyBox}>
+                  <MatIcon name="alert-circle-outline" size={36} color="#ccc" />
+                  <Text style={[styles.emptyText, { marginTop: 8 }]}>{this.state.submissionsError}</Text>
+                </View>
+              ) : (
+                <FlatList
+                  data={this.state.submissions}
+                  keyExtractor={(item) => item.id.toString()}
+                  contentContainerStyle={{ paddingBottom: 20 }}
+                  ListEmptyComponent={
+                    <View style={styles.emptyBox}>
+                      <MatIcon name="account-off-outline" size={40} color="#ccc" />
+                      <Text style={[styles.emptyText, { marginTop: 8 }]}>No submissions yet.</Text>
+                    </View>
+                  }
+                  renderItem={({ item }) => (
+                    <View style={styles.submissionItem}>
+                      <View style={styles.submissionAvatar}>
+                        <Text style={styles.submissionAvatarText}>
+                          {item.studentName?.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.submissionInfo}>
+                        <Text style={styles.submissionName}>{item.studentName}</Text>
+                        <Text style={styles.submissionMeta}>Roll No: {item.rollNo} · {item.submittedDate}</Text>
+                        {item.remarks ? (
+                          <Text style={styles.submissionRemarks} numberOfLines={2}>{item.remarks}</Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.submissionStatusBadge}>
+                        <Text style={styles.submissionStatusText}>{item.status}</Text>
+                      </View>
+                    </View>
+                  )}
+                />
+              )}
+            </View>
+          </View>
+        </Modal>
+
       </SafeAreaView>
     );
   }
@@ -494,6 +568,16 @@ const styles = StyleSheet.create({
   fullImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.8 },
   emptyBox: { alignItems: 'center', marginTop: 30 },
   emptyText: { color: '#999' },
+  // Submissions
+  submissionItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', padding: 12, borderRadius: 15, marginBottom: 10 },
+  submissionAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
+  submissionAvatarText: { color: PRIMARY, fontWeight: 'bold', fontSize: 15 },
+  submissionInfo: { flex: 1, marginLeft: 10 },
+  submissionName: { fontSize: 13, fontWeight: 'bold', color: '#1a1a2e' },
+  submissionMeta: { fontSize: 11, color: '#999', marginTop: 2 },
+  submissionRemarks: { fontSize: 11, color: '#777', marginTop: 3 },
+  submissionStatusBadge: { backgroundColor: '#e4ffed', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  submissionStatusText: { fontSize: 11, fontWeight: '600', color: '#2e7d32' },
 });
 
 export default TeacherAssignments;

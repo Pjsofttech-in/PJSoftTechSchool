@@ -98,6 +98,27 @@ export const teacherApi = {
     return response.data;
   },
 
+  // Get submissions for a particular assignment
+  getSubmissionsByAssignmentId: async (email, assignmentId) => {
+    try {
+      const response = await api.get(`/getSubmissionsByAssignmentId`, {
+        params: {
+          role: 'teacher',
+          email: email,
+          assignmentId: assignmentId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch submissions.';
+      console.error(`[TeacherApi] getSubmissionsByAssignmentId failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
   // Create a new assignment with image upload
   // API: POST /createAssignment?role=teacher&email=<email>
   // Body: multipart/form-data → assignment (JSON string) + image (binary)
