@@ -98,8 +98,8 @@ export class TeacherClassRoom extends Component {
           <Text style={styles.mainTitle}>Division {item.division} | {item.medium}</Text>
           <Text style={styles.subTitle}>{item.startTime} - {item.endTime}</Text>
         </View>
-        <View style={styles.branchBadge}>
-          <Text style={styles.branchText}>{item.branchCode}</Text>
+        <View style={styles.yearBadge}>
+          <Text style={styles.yearText}>{item.year}</Text>
         </View>
       </View>
 
@@ -264,8 +264,8 @@ const styles = StyleSheet.create({
   headerText: { marginLeft: 12, flex: 1 },
   mainTitle: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e' },
   subTitle: { fontSize: 12, color: '#666' },
-  branchBadge: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  branchText: { fontSize: 10, color: '#999', fontWeight: 'bold' },
+  yearBadge: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  yearText: { fontSize: 10, color: '#999', fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 15 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', gap: 10 },
   actionBtn: { width: '48%', flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, gap: 8, backgroundColor: '#fff' },
