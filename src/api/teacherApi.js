@@ -214,4 +214,21 @@ export const teacherApi = {
     }
   },
 
+  // Get notifications/notices from branch
+  getNotifications: async (email) => {
+    try {
+      const response = await api.get('/getNotificationByBranchCode', {
+        params: {
+          role: 'teacher',
+          email: email,
+        },
+      });
+
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error(`[TeacherApi] getNotifications failed: ${error.message}`);
+      return []; // Return empty array to keep Dashboard stable
+    }
+  },
+
 };
