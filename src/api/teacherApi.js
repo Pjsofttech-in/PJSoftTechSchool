@@ -144,6 +144,31 @@ export const teacherApi = {
     }
   },
 
+  // Update an existing assignment
+  updateAssignment: async (id, formData, email) => {
+    try {
+      const assignmentPart = formData._parts.find(p => p[0] === 'assignment');
+      const assignmentData = assignmentPart ? JSON.parse(assignmentPart[1]) : {};
+      const response = await api.put(`/updateAssignment/${id}`, assignmentData, {
+        params: {
+          role: 'teacher',
+          email: email,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to update assignment.';
+      console.error(`[TeacherApi] updateAssignment failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
   // Get all exams for a particular classroom
   // API: GET /getExamByClassId?classId=2&role=teacher&email=...
   getExamByClassId: async (email, classId) => {

@@ -31,6 +31,9 @@ export class TeacherAssignments extends Component {
       selectedClassId: null,
       selectedImage: null,
       submitAttempted: false,
+      // Edit Mode 
+      editingAssignmentId: null,
+      existingImageUrl: null,
       // Submissions
       isSubmissionsModalVisible: false,
       submissions: [],
@@ -74,6 +77,20 @@ export class TeacherAssignments extends Component {
     }
   };
 
+  handleEditPress = (item) => {
+    this.setState({
+      isAddModalVisible: true,
+      editingAssignmentId: item.id,
+      newTitle: item.assignmentTitle,
+      newDesc: item.description,
+      newDate: new Date(item.dueDate),
+      selectedClassId: item.classRoomId,
+      existingImageUrl: item.image,
+      selectedImage: null,
+      submitAttempted: false,
+    });
+  };
+
   closeAddModal = () => {
     this.setState({
       isAddModalVisible: false,
@@ -83,6 +100,8 @@ export class TeacherAssignments extends Component {
       selectedImage: null,
       submitAttempted: false,
       uploading: false,
+      editingAssignmentId: null,
+      existingImageUrl: null,
     });
   };
 
@@ -90,13 +109,13 @@ export class TeacherAssignments extends Component {
     const options = { mediaType: 'photo', quality: 0.8 };
     launchImageLibrary(options, (response) => {
       if (response.assets && response.assets.length > 0) {
-        this.setState({ selectedImage: response.assets[0] });
+        this.setState({ selectedImage: response.assets[0], existingImageUrl: null });
       }
     });
   };
 
   handleRemoveImage = () => {
-    this.setState({ selectedImage: null });
+    this.setState({ selectedImage: null, existingImageUrl: null });
   };
 
   fetchSubmissions = async (assignmentId, assignmentTitle) => {
@@ -118,20 +137,19 @@ export class TeacherAssignments extends Component {
   };
 
   handlePostAssignment = async () => {
-    const { newTitle, newDesc, newDate, selectedClassId, selectedImage } = this.state;
+    const { newTitle, newDesc, newDate, selectedClassId, selectedImage, editingAssignmentId, existingImageUrl } = this.state;
     const { user } = useAuthStore.getState();
 
     this.setState({ submitAttempted: true });
 
-    if (!newTitle || !newDesc || !selectedImage) {
-      ToastAndroid.show('Please fill all fields and pick an image', ToastAndroid.SHORT);
+    // Validation: Image is required only if it's a new post or if we removed existing image
+    if (!newTitle || !newDesc || (!selectedImage && !existingImageUrl)) {
+      ToastAndroid.show('Please fill all fields and provide an image', ToastAndroid.SHORT);
       return;
     }
 
     this.setState({ uploading: true });
 
-    // Build multipart/form-data body — only 'assignment' JSON + 'image' binary.
-    // 'role' and 'email' go as query params (handled inside teacherApi.createAssignment).
     const formData = new FormData();
     const assignmentPayload = {
       assignmentTitle: newTitle,
@@ -145,20 +163,33 @@ export class TeacherAssignments extends Component {
     };
 
     formData.append('assignment', JSON.stringify(assignmentPayload));
-    formData.append('image', {
-      uri: selectedImage.uri,
-      type: selectedImage.type || 'image/jpeg',
-      name: selectedImage.fileName || 'assignment.jpg',
-    });
+    
+    if (selectedImage) {
+      formData.append('image', {
+        uri: selectedImage.uri,
+        type: selectedImage.type || 'image/jpeg',
+        name: selectedImage.fileName || 'assignment.jpg',
+      });
+    }
 
     try {
-      // Pass email separately so teacherApi can send it as a query param
-      await teacherApi.createAssignment(formData, user.email);
-      ToastAndroid.show('Assignment posted successfully!', ToastAndroid.LONG);
+      if (editingAssignmentId) {
+        // Edit Mode
+        await teacherApi.updateAssignment(editingAssignmentId, formData, user.email);
+        ToastAndroid.show('Assignment updated successfully!', ToastAndroid.SHORT);
+      } else {
+        // Create Mode
+        await teacherApi.createAssignment(formData, user.email);
+        ToastAndroid.show('Assignment posted successfully!', ToastAndroid.LONG);
+      }
       this.closeAddModal();
+      // Refresh list if view modal is open
+      if (this.state.isViewModalVisible) {
+        this.fetchAssignments(selectedClassId, this.state.selectedClassName);
+      }
     } catch (err) {
       this.setState({ uploading: false });
-      ToastAndroid.show('Server error while posting', ToastAndroid.SHORT);
+      ToastAndroid.show('Server error while saving', ToastAndroid.SHORT);
     }
   };
 
@@ -171,7 +202,7 @@ export class TeacherAssignments extends Component {
       )}
       <View style={styles.assignmentInfo}>
         <Text style={styles.assignmentTitle}>{item.assignmentTitle}</Text>
-        <Text style={styles.assignmentDesc} numberOfLines={1}>{item.description}</Text>
+        <Text style={styles.assignmentDesc} numberOfLines={2}>{item.description}</Text>
         <View style={styles.dateRow}>
           <MatIcon name="calendar-clock" size={12} color="#888" />
           <Text style={styles.dateText}>Due: {item.dueDate}</Text>
@@ -186,7 +217,7 @@ export class TeacherAssignments extends Component {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.editSmallBtn}
-          onPress={() => ToastAndroid.show('Edit coming soon', ToastAndroid.SHORT)}
+          onPress={() => this.handleEditPress(item)}
         >
           <MatIcon name="pencil-outline" size={18} color={PRIMARY} />
         </TouchableOpacity>
@@ -219,6 +250,7 @@ export class TeacherAssignments extends Component {
             isAddModalVisible: true,
             selectedClassId: item.id,
             selectedClassName: `${item.standard}-${item.division}`,
+            editingAssignmentId: null,
           })}
         >
           <MatIcon name="plus" size={18} color="#fff" />
@@ -233,7 +265,7 @@ export class TeacherAssignments extends Component {
       return (
         <View style={styles.centered}>
           <MatIcon name="wifi-off" size={40} color="#ccc" />
-          <Text style={{ color: '#999', marginTop: 12, textAlign: 'center' }}>{this.state.error}</Text>
+          <Text style={styles.retryText}>{this.state.error}</Text>
           <TouchableOpacity
             style={[styles.btn, styles.addBtn, { marginTop: 20, paddingHorizontal: 24, flex: 0 }]}
             onPress={this.fetchClassrooms}
@@ -249,7 +281,7 @@ export class TeacherAssignments extends Component {
       return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>;
     }
 
-    const { submitAttempted, selectedImage, newTitle, newDesc } = this.state;
+    const { submitAttempted, selectedImage, newTitle, newDesc, editingAssignmentId, existingImageUrl } = this.state;
 
     return (
       <SafeAreaView style={styles.container}>
@@ -305,7 +337,7 @@ export class TeacherAssignments extends Component {
           </View>
         </Modal>
 
-        {/* Add Modal */}
+        {/* Add/Edit Modal */}
         <Modal
           visible={this.state.isAddModalVisible}
           animationType="slide"
@@ -319,8 +351,8 @@ export class TeacherAssignments extends Component {
             >
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Create Assignment</Text>
-                  <Text style={{ fontSize: 12, color: '#999' }}>Class: {this.state.selectedClassName}</Text>
+                  <Text style={styles.modalTitle}>{editingAssignmentId ? 'Edit Assignment' : 'Create Assignment'}</Text>
+                  <Text style={styles.modalSubTitle}>Class: {this.state.selectedClassName}</Text>
                 </View>
                 <TouchableOpacity onPress={this.closeAddModal}>
                   <MatIcon name="close-circle" size={28} color="#ccc" />
@@ -338,12 +370,12 @@ export class TeacherAssignments extends Component {
                 <TextInput
                   style={[
                     styles.input,
-                    // FIX: red border highlight on failed submit
                     submitAttempted && !newTitle ? { borderColor: '#ff4d4d' } : null,
                   ]}
                   value={this.state.newTitle}
                   onChangeText={(t) => this.setState({ newTitle: t })}
                   placeholder="e.g. Math Quiz"
+                  placeholderTextColor="#999"
                 />
 
                 <Text style={styles.label}>
@@ -359,6 +391,7 @@ export class TeacherAssignments extends Component {
                   value={this.state.newDesc}
                   onChangeText={(t) => this.setState({ newDesc: t })}
                   placeholder="Enter details..."
+                  placeholderTextColor="#999"
                 />
 
                 <Text style={styles.label}>Due Date</Text>
@@ -367,7 +400,7 @@ export class TeacherAssignments extends Component {
                   onPress={() => this.setState({ showDatePicker: true })}
                 >
                   <MatIcon name="calendar-clock" size={20} color={PRIMARY} />
-                  <Text style={{ color: '#333' }}>{this.state.newDate.toDateString()}</Text>
+                  <Text style={styles.datePickerText}>{this.state.newDate.toDateString()}</Text>
                 </TouchableOpacity>
 
                 <Text style={styles.label}>
@@ -376,14 +409,16 @@ export class TeacherAssignments extends Component {
                 <TouchableOpacity
                   style={[
                     styles.imagePickBtn,
-                    submitAttempted && !selectedImage ? { borderColor: '#ff4d4d' } : null,
+                    submitAttempted && !selectedImage && !existingImageUrl ? { borderColor: '#ff4d4d' } : null,
                   ]}
                   onPress={this.handlePickImage}
                 >
-                  {selectedImage ? (
+                  {selectedImage || existingImageUrl ? (
                     <View style={{ width: '100%', height: '100%' }}>
-                      <Image source={{ uri: selectedImage.uri }} style={styles.previewThumb} />
-                      {/* FIX: remove image button overlay */}
+                      <Image 
+                        source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl }} 
+                        style={styles.previewThumb} 
+                      />
                       <TouchableOpacity
                         style={styles.removeImageBtn}
                         onPress={this.handleRemoveImage}
@@ -394,7 +429,7 @@ export class TeacherAssignments extends Component {
                   ) : (
                     <View style={styles.imagePlaceholder}>
                       <MatIcon name="camera-plus-outline" size={30} color="#aaa" />
-                      <Text style={{ color: '#aaa', fontSize: 12 }}>Pick Image</Text>
+                      <Text style={styles.imagePlaceholderText}>Pick Image</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -406,7 +441,9 @@ export class TeacherAssignments extends Component {
                 >
                   {this.state.uploading
                     ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.submitBtnText}>Post Assignment</Text>
+                    : <Text style={styles.submitBtnText}>
+                        {editingAssignmentId ? 'Update Assignment' : 'Post Assignment'}
+                      </Text>
                   }
                 </TouchableOpacity>
               </ScrollView>
@@ -464,7 +501,7 @@ export class TeacherAssignments extends Component {
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.modalTitle}>Submissions</Text>
-                  <Text style={{ fontSize: 12, color: '#999' }} numberOfLines={1}>
+                  <Text style={styles.modalSubText} numberOfLines={1}>
                     {this.state.selectedAssignmentTitle}
                   </Text>
                 </View>
@@ -525,59 +562,64 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fe' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
-  headerSub: { fontSize: 11, color: '#888', marginTop: 4 },
+  headerSub: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#888', marginTop: 4 },
+  retryText: { fontFamily: 'Poppins-Regular', color: '#999', marginTop: 12, textAlign: 'center' },
   listContainer: { padding: 16 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 16, elevation: 3 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   standardBadge: { width: 50, height: 50, borderRadius: 15, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
-  standardText: { color: PRIMARY, fontWeight: 'bold', fontSize: 16 },
+  standardText: { fontFamily: 'Poppins-Medium', color: PRIMARY, fontSize: 16 },
   titleContainer: { marginLeft: 15 },
-  mainTitle: { fontSize: 16, fontWeight: 'bold', color: '#1a1a2e' },
-  subTitle: { fontSize: 12, color: '#666', marginTop: 2 },
+  mainTitle: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#1a1a2e' },
+  subTitle: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#666', marginTop: 2 },
   buttonRow: { flexDirection: 'row', gap: 10 },
   btn: { flex: 1, flexDirection: 'row', height: 45, borderRadius: 12, justifyContent: 'center', alignItems: 'center', gap: 8 },
   viewBtn: { borderWidth: 1, borderColor: PRIMARY },
-  viewBtnText: { color: PRIMARY, fontWeight: '600', fontSize: 13 },
+  viewBtnText: { fontFamily: 'Poppins-Medium', color: PRIMARY, fontSize: 13 },
   addBtn: { backgroundColor: PRIMARY },
-  addBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  addBtnText: { fontFamily: 'Poppins-Medium', color: '#fff', fontSize: 13 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a2e' },
+  modalTitle: { fontFamily: 'Poppins-Medium', fontSize: 18, color: '#1a1a2e' },
+  modalSubTitle: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#999' },
   assignmentItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', padding: 12, borderRadius: 15, marginBottom: 12 },
   assignmentThumb: { width: 50, height: 50, borderRadius: 10 },
   assignmentInfo: { flex: 1, marginLeft: 12 },
-  assignmentTitle: { fontSize: 14, fontWeight: 'bold' },
-  assignmentDesc: { fontSize: 12, color: '#777' },
+  assignmentTitle: { fontFamily: 'Poppins-Medium', fontSize: 14, color: '#333' },
+  assignmentDesc: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#777' },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  dateText: { fontSize: 11, color: '#888' },
+  dateText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#888' },
   actionBtnGroup: { marginLeft: 10, alignItems: 'center' },
   editSmallBtn: { width: 35, height: 35, borderRadius: 10, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
-  label: { fontSize: 14, fontWeight: '600', marginBottom: 5, marginTop: 15, color: '#333' },
-  input: { borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 12, backgroundColor: '#f9f9f9', color: '#333' },
+  label: { fontFamily: 'Poppins-Medium', fontSize: 14, marginBottom: 5, marginTop: 15, color: '#333' },
+  input: { fontFamily: 'Poppins-Regular', borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 12, backgroundColor: '#f9f9f9', color: '#333' },
   datePickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#eee', borderRadius: 12, padding: 12, backgroundColor: '#f9f9f9' },
+  datePickerText: { fontFamily: 'Poppins-Regular', color: '#333' },
   imagePickBtn: { marginTop: 10, width: '100%', height: 160, borderRadius: 15, borderWidth: 1, borderColor: '#ddd', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fcfcfc' },
   imagePlaceholder: { alignItems: 'center' },
+  imagePlaceholderText: { fontFamily: 'Poppins-Regular', color: '#aaa', fontSize: 12 },
   previewThumb: { width: '100%', height: '100%', borderRadius: 15 },
   removeImageBtn: { position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 12 },
   submitBtn: { backgroundColor: PRIMARY, height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 30, marginBottom: 20 },
-  submitBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  submitBtnText: { fontFamily: 'Poppins-Medium', color: '#fff', fontSize: 16 },
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' },
   previewClose: { position: 'absolute', top: 50, right: 25, zIndex: 100 },
   scrollViewCentered: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
   fullImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.8 },
   emptyBox: { alignItems: 'center', marginTop: 30 },
-  emptyText: { color: '#999' },
+  emptyText: { fontFamily: 'Poppins-Regular', color: '#999' },
   // Submissions
   submissionItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', padding: 12, borderRadius: 15, marginBottom: 10 },
   submissionAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
-  submissionAvatarText: { color: PRIMARY, fontWeight: 'bold', fontSize: 15 },
+  submissionAvatarText: { fontFamily: 'Poppins-Medium', color: PRIMARY, fontSize: 15 },
   submissionInfo: { flex: 1, marginLeft: 10 },
-  submissionName: { fontSize: 13, fontWeight: 'bold', color: '#1a1a2e' },
-  submissionMeta: { fontSize: 11, color: '#999', marginTop: 2 },
-  submissionRemarks: { fontSize: 11, color: '#777', marginTop: 3 },
+  submissionName: { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#1a1a2e' },
+  submissionMeta: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#999', marginTop: 2 },
+  submissionRemarks: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#777', marginTop: 3 },
   submissionStatusBadge: { backgroundColor: '#e4ffed', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  submissionStatusText: { fontSize: 11, fontWeight: '600', color: '#2e7d32' },
+  submissionStatusText: { fontFamily: 'Poppins-Medium', fontSize: 11, color: '#2e7d32' },
+  modalSubText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#999' },
 });
 
 export default TeacherAssignments;
