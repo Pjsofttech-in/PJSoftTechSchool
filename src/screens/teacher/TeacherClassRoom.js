@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f0f2f7' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   topBar: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
-  topBarSub: { fontSize: 11, color: '#888', marginTop: 4 },
+  topBarSub: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#888', marginTop: 4 },
   list: { padding: 16 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 16, marginBottom: 16, elevation: 4 },
   cardHeader: { flexDirection: 'row', alignItems: 'center' },

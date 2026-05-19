@@ -48,7 +48,7 @@ export class TeacherDashboard extends Component {
   render() {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
+        <View style={styles.noticeContainer}>
           
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Latest Notices</Text>
@@ -83,8 +83,8 @@ export class TeacherDashboard extends Component {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fe' },
-  content: { paddingVertical: 8 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 6 },
+  noticeContainer: { paddingVertical: 0 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, marginBottom: 6, backgroundColor: '#fff', elevation: 2, },
   sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#1a1a2e' },
   viewAllText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: PRIMARY },
   noticeList: { paddingLeft: 16, paddingRight: 6 },
