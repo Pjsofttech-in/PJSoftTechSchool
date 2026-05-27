@@ -3,6 +3,8 @@ import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
+import { ClassroomFilterBar } from '@components/ClassroomFilterBar';
+import { applyClassroomFilters } from '@utils/classroomFilterUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
@@ -11,14 +13,16 @@ export class TeacherClassRoom extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      classrooms: [],
+      allClassrooms: [],   // full unfiltered list from API
+      classrooms: [],      // filtered list
       students: [],
       timetable: [],
       loading: true,
       modalLoading: false,
       isStudentModalVisible: false,
       isScheduleModalVisible: false,
-      selectedClassName: ''
+      selectedClassName: '',
+      activeFilters: {},
     };
   }
 
@@ -27,14 +31,21 @@ export class TeacherClassRoom extends Component {
   }
 
   fetchClassrooms = async () => {
+    this.setState({ loading: true });
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getClassRooms(user.id, user.email);
-      this.setState({ classrooms: data, loading: false });
+      const filtered = applyClassroomFilters(data, this.state.activeFilters);
+      this.setState({ allClassrooms: data, classrooms: filtered, loading: false });
     } catch (err) {
       console.error('[ClassRoomHub] Fetch Error:', err);
       this.setState({ loading: false });
     }
+  };
+
+  handleFilterApply = (filters) => {
+    const filtered = applyClassroomFilters(this.state.allClassrooms, filters);
+    this.setState({ activeFilters: filters, classrooms: filtered });
   };
 
   fetchStudents = async (classId, className) => {
@@ -72,14 +83,10 @@ export class TeacherClassRoom extends Component {
   };
 
   makeCall = (phoneNumber) => {
-  if (!phoneNumber) {
-    alert('Contact number not available for this student');
-    return;
-  }
-  
-  const url = Platform.OS === 'android' ? `tel:${phoneNumber}` : `telprompt:${phoneNumber}`;
-  Linking.openURL(url).catch(err => console.error("Couldn't open dialer", err));
-};
+    if (!phoneNumber) { alert('Contact number not available for this student'); return; }
+    const url = Platform.OS === 'android' ? `tel:${phoneNumber}` : `telprompt:${phoneNumber}`;
+    Linking.openURL(url).catch((err) => console.error("Couldn't open dialer", err));
+  };
 
   renderActionButton = (icon, label, color, onPress) => (
     <TouchableOpacity activeOpacity={0.7} style={[styles.actionBtn, { borderColor: color }]} onPress={onPress}>
@@ -123,7 +130,7 @@ export class TeacherClassRoom extends Component {
         <Text style={styles.studentSub}>Roll No: {item.rollNo} • {item.gender}</Text>
       </View>
       <TouchableOpacity onPress={() => this.makeCall(item.contact)}>
-        <MatIcon name="phone-outline" size={22} color={item.contact ? "#4caf50" : "#ccc"} />
+        <MatIcon name="phone-outline" size={22} color={item.contact ? '#4caf50' : '#ccc'} />
       </TouchableOpacity>
     </View>
   );
@@ -166,9 +173,7 @@ export class TeacherClassRoom extends Component {
   );
 
   render() {
-    if (this.state.loading) {
-      return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>;
-    }
+    const { user } = useAuthStore.getState();
 
     return (
       <SafeAreaView style={styles.container}>
@@ -176,20 +181,22 @@ export class TeacherClassRoom extends Component {
           <Text style={styles.topBarSub}>Select a class to manage records</Text>
         </View>
 
-        <FlatList
-          data={this.state.classrooms}
-          renderItem={this.renderClassItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.list}
-        />
+        <ClassroomFilterBar email={user.email} onApply={this.handleFilterApply} />
+
+        {this.state.loading ? (
+          <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+        ) : (
+          <FlatList
+            data={this.state.classrooms}
+            renderItem={this.renderClassItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={this.renderEmptyState('google-classroom', 'No classrooms match the selected filters.')}
+          />
+        )}
 
         {/* Student List Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={this.state.isStudentModalVisible}
-          onRequestClose={() => this.setState({ isStudentModalVisible: false })}
-        >
+        <Modal animationType="slide" transparent visible={this.state.isStudentModalVisible} onRequestClose={() => this.setState({ isStudentModalVisible: false })}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
@@ -204,7 +211,7 @@ export class TeacherClassRoom extends Component {
                 <FlatList
                   data={this.state.students}
                   renderItem={this.renderStudentItem}
-                  ListEmptyComponent={() => this.renderEmptyState("account-search-outline", "No students found in this class")}
+                  ListEmptyComponent={() => this.renderEmptyState('account-search-outline', 'No students found in this class')}
                   keyExtractor={(item) => item.id.toString()}
                   contentContainerStyle={{ paddingBottom: 20 }}
                 />
@@ -214,12 +221,7 @@ export class TeacherClassRoom extends Component {
         </Modal>
 
         {/* Schedule Modal */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={this.state.isScheduleModalVisible}
-          onRequestClose={() => this.setState({ isScheduleModalVisible: false })}
-        >
+        <Modal animationType="fade" transparent visible={this.state.isScheduleModalVisible} onRequestClose={() => this.setState({ isScheduleModalVisible: false })}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { height: SCREEN_HEIGHT * 0.85 }]}>
               <View style={styles.modalHeader}>
@@ -234,7 +236,7 @@ export class TeacherClassRoom extends Component {
                 <FlatList
                   data={this.state.timetable}
                   renderItem={this.renderDayItem}
-                  ListEmptyComponent={() => this.renderEmptyState("calendar-remove-outline", "No schedule has been created for this class yet.")}
+                  ListEmptyComponent={() => this.renderEmptyState('calendar-remove-outline', 'No schedule has been created for this class yet.')}
                   keyExtractor={(item, index) => index.toString()}
                   contentContainerStyle={{ paddingBottom: 20 }}
                 />
@@ -263,9 +265,9 @@ const styles = StyleSheet.create({
   yearBadge: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   yearText: { fontSize: 10, color: '#999', fontWeight: 'bold' },
   divider: { height: 1, backgroundColor: '#f0f0f0', marginVertical: 15 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', },
-  actionBtn: { width: '32%', flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, backgroundColor: '#fff', elevation: 2, },
-  actionLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', marginLeft: 6, },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  actionBtn: { width: '32%', flexDirection: 'row', alignItems: 'center', padding: 10, borderRadius: 12, borderWidth: 1, backgroundColor: '#fff', elevation: 2 },
+  actionLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', marginLeft: 6 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 25, borderTopRightRadius: 25, height: SCREEN_HEIGHT * 0.8, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -276,7 +278,7 @@ const styles = StyleSheet.create({
   studentInfo: { flex: 1, marginLeft: 12 },
   studentName: { fontSize: 14, fontWeight: 'bold', color: '#1a1a2e' },
   studentSub: { fontSize: 11, color: '#777' },
-  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyContainer: { alignItems: 'center', marginTop: 80 },
   emptyText: { marginTop: 10, color: '#999', fontSize: 14, textAlign: 'center', paddingHorizontal: 40 },
   dayCard: { backgroundColor: '#fff', borderRadius: 15, marginBottom: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#eee' },
   dayHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f8f7ff', padding: 12, borderBottomWidth: 1, borderBottomColor: '#eee', gap: 8 },

@@ -29,6 +29,58 @@ export const teacherApi = {
     }
   },
 
+  // Filter APIs
+  getAcademicYears: async (email) => {
+    const response = await api.get('/getAllAcademicYear', {
+      params: { role: 'teacher', email },
+    });
+    return response.data;
+  },
+ 
+  getMediums: async (email) => {
+    const response = await api.get('/getAllMedium', {
+      params: { role: 'teacher', email },
+    });
+    return response.data;
+  },
+ 
+  getStreams: async (email) => {
+    const response = await api.get('/getAllStream', {
+      params: { role: 'teacher', email },
+    });
+    return response.data;
+  },
+ 
+  getDivisions: async (email) => {
+    const response = await api.get('/getAllDivision', {
+      params: { role: 'teacher', email },
+    });
+    return response.data;
+  },
+ 
+  getStandards: async (email) => {
+    const response = await api.get('/getAllStandard', {
+      params: { role: 'teacher', email },
+    });
+    return response.data;
+  },
+ 
+  // Dependent on stream selection
+  getGraduationTypes: async (email, streamName) => {
+    const response = await api.get('/graduationTypesByStreamName', {
+      params: { role: 'teacher', email, streamName },
+    });
+    return response.data;
+  },
+ 
+  // Dependent on graduationType selection needs id
+  getDegreeNames: async (email, graduationTypeId) => {
+    const response = await api.get('/getDegreeNameByGraduationType', {
+      params: { role: 'teacher', email, graduationTypeId },
+    });
+    return response.data;
+  },
+
   // Get all ClassRooms
   getClassRooms: async (id, email) => {
     try {

@@ -5,6 +5,8 @@ import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
 import { launchImageLibrary } from 'react-native-image-picker';
 import DatePicker from 'react-native-date-picker';
+import { ClassroomFilterBar } from '@components/ClassroomFilterBar';
+import { applyClassroomFilters } from '@utils/classroomFilterUtils';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
@@ -13,12 +15,13 @@ export class TeacherAssignments extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      allClassrooms: [],
       classrooms: [],
       assignments: [],
       loading: true,
-      error: null,             
+      error: null,
       modalLoading: false,
-      assignmentError: null,        
+      assignmentError: null,
       isViewModalVisible: false,
       selectedClassName: '',
       previewImage: null,
@@ -40,6 +43,7 @@ export class TeacherAssignments extends Component {
       submissionsLoading: false,
       submissionsError: null,
       selectedAssignmentTitle: '',
+      activeFilters: {},
     };
   }
 
@@ -52,21 +56,21 @@ export class TeacherAssignments extends Component {
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getClassRooms(user.id, user.email);
-      this.setState({ classrooms: data, loading: false });
+      const filtered = applyClassroomFilters(data, this.state.activeFilters);
+      this.setState({ allClassrooms: data, classrooms: filtered, loading: false });
     } catch (err) {
       console.error('[Assignments] Fetch Error:', err);
       this.setState({ loading: false, error: 'Failed to load classrooms. Tap to retry.' });
     }
   };
 
+  handleFilterApply = (filters) => {
+    const filtered = applyClassroomFilters(this.state.allClassrooms, filters);
+    this.setState({ activeFilters: filters, classrooms: filtered });
+  };
+
   fetchAssignments = async (classId, className) => {
-    this.setState({
-      isViewModalVisible: true,
-      modalLoading: true,
-      assignmentError: null,
-      selectedClassName: className,
-      assignments: []
-    });
+    this.setState({ isViewModalVisible: true, modalLoading: true, assignmentError: null, selectedClassName: className, assignments: [] });
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getAssignmentsByClass(user.email, classId);
@@ -93,45 +97,29 @@ export class TeacherAssignments extends Component {
 
   closeAddModal = () => {
     this.setState({
-      isAddModalVisible: false,
-      newTitle: '',
-      newDesc: '',
-      newDate: new Date(),
-      selectedImage: null,
-      submitAttempted: false,
-      uploading: false,
-      editingAssignmentId: null,
-      existingImageUrl: null,
+      isAddModalVisible: false, newTitle: '', newDesc: '', newDate: new Date(),
+      selectedImage: null, submitAttempted: false, uploading: false,
+      editingAssignmentId: null, existingImageUrl: null,
     });
   };
 
   handlePickImage = () => {
-    const options = { mediaType: 'photo', quality: 0.8 };
-    launchImageLibrary(options, (response) => {
+    launchImageLibrary({ mediaType: 'photo', quality: 0.8 }, (response) => {
       if (response.assets && response.assets.length > 0) {
         this.setState({ selectedImage: response.assets[0], existingImageUrl: null });
       }
     });
   };
 
-  handleRemoveImage = () => {
-    this.setState({ selectedImage: null, existingImageUrl: null });
-  };
+  handleRemoveImage = () => { this.setState({ selectedImage: null, existingImageUrl: null }); };
 
   fetchSubmissions = async (assignmentId, assignmentTitle) => {
-    this.setState({
-      isSubmissionsModalVisible: true,
-      submissionsLoading: true,
-      submissionsError: null,
-      submissions: [],
-      selectedAssignmentTitle: assignmentTitle,
-    });
+    this.setState({ isSubmissionsModalVisible: true, submissionsLoading: true, submissionsError: null, submissions: [], selectedAssignmentTitle: assignmentTitle });
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getSubmissionsByAssignmentId(user.email, assignmentId);
       this.setState({ submissions: data, submissionsLoading: false });
     } catch (err) {
-      console.error('Fetch Submissions Error:', err);
       this.setState({ submissionsLoading: false, submissionsError: 'Failed to load submissions. Please try again.' });
     }
   };
@@ -139,54 +127,35 @@ export class TeacherAssignments extends Component {
   handlePostAssignment = async () => {
     const { newTitle, newDesc, newDate, selectedClassId, selectedImage, editingAssignmentId, existingImageUrl } = this.state;
     const { user } = useAuthStore.getState();
-
     this.setState({ submitAttempted: true });
-
-    // Validation: Image is required only if it's a new post or if we removed existing image
     if (!newTitle || !newDesc || (!selectedImage && !existingImageUrl)) {
       ToastAndroid.show('Please fill all fields and provide an image', ToastAndroid.SHORT);
       return;
     }
-
     this.setState({ uploading: true });
-
     const formData = new FormData();
     const assignmentPayload = {
-      assignmentTitle: newTitle,
-      description: newDesc,
+      assignmentTitle: newTitle, description: newDesc,
       dueDate: newDate.toISOString().split('T')[0],
-      branchCode: user.branchCode,
-      role: 'teacher',
+      branchCode: user.branchCode, role: 'teacher',
       createdByEmail: user.email,
       teacher: { id: String(user.id) },
       classRoom: { id: selectedClassId },
     };
-
     formData.append('assignment', JSON.stringify(assignmentPayload));
-    
     if (selectedImage) {
-      formData.append('image', {
-        uri: selectedImage.uri,
-        type: selectedImage.type || 'image/jpeg',
-        name: selectedImage.fileName || 'assignment.jpg',
-      });
+      formData.append('image', { uri: selectedImage.uri, type: selectedImage.type || 'image/jpeg', name: selectedImage.fileName || 'assignment.jpg' });
     }
-
     try {
       if (editingAssignmentId) {
-        // Edit Mode
         await teacherApi.updateAssignment(editingAssignmentId, formData, user.email);
         ToastAndroid.show('Assignment updated successfully!', ToastAndroid.SHORT);
       } else {
-        // Create Mode
         await teacherApi.createAssignment(formData, user.email);
         ToastAndroid.show('Assignment posted successfully!', ToastAndroid.LONG);
       }
       this.closeAddModal();
-      // Refresh list if view modal is open
-      if (this.state.isViewModalVisible) {
-        this.fetchAssignments(selectedClassId, this.state.selectedClassName);
-      }
+      if (this.state.isViewModalVisible) this.fetchAssignments(selectedClassId, this.state.selectedClassName);
     } catch (err) {
       this.setState({ uploading: false });
       ToastAndroid.show('Server error while saving', ToastAndroid.SHORT);
@@ -209,16 +178,10 @@ export class TeacherAssignments extends Component {
         </View>
       </View>
       <View style={styles.actionBtnGroup}>
-        <TouchableOpacity
-          style={[styles.editSmallBtn, { marginBottom: 8 }]}
-          onPress={() => this.fetchSubmissions(item.id, item.assignmentTitle)}
-        >
+        <TouchableOpacity style={[styles.editSmallBtn, { marginBottom: 8 }]} onPress={() => this.fetchSubmissions(item.id, item.assignmentTitle)}>
           <MatIcon name="account-details-outline" size={18} color={PRIMARY} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.editSmallBtn}
-          onPress={() => this.handleEditPress(item)}
-        >
+        <TouchableOpacity style={styles.editSmallBtn} onPress={() => this.handleEditPress(item)}>
           <MatIcon name="pencil-outline" size={18} color={PRIMARY} />
         </TouchableOpacity>
       </View>
@@ -237,22 +200,11 @@ export class TeacherAssignments extends Component {
         </View>
       </View>
       <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.btn, styles.viewBtn]}
-          onPress={() => this.fetchAssignments(item.id, `${item.standard}-${item.division}`)}
-        >
+        <TouchableOpacity style={[styles.btn, styles.viewBtn]} onPress={() => this.fetchAssignments(item.id, `${item.standard}-${item.division}`)}>
           <MatIcon name="eye-outline" size={18} color={PRIMARY} />
           <Text style={styles.viewBtnText}>View All</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.btn, styles.addBtn]}
-          onPress={() => this.setState({
-            isAddModalVisible: true,
-            selectedClassId: item.id,
-            selectedClassName: `${item.standard}-${item.division}`,
-            editingAssignmentId: null,
-          })}
-        >
+        <TouchableOpacity style={[styles.btn, styles.addBtn]} onPress={() => this.setState({ isAddModalVisible: true, selectedClassId: item.id, selectedClassName: `${item.standard}-${item.division}`, editingAssignmentId: null })}>
           <MatIcon name="plus" size={18} color="#fff" />
           <Text style={styles.addBtnText}>Add New</Text>
         </TouchableOpacity>
@@ -261,24 +213,19 @@ export class TeacherAssignments extends Component {
   );
 
   render() {
+    const { user } = useAuthStore.getState();
+
     if (this.state.error) {
       return (
         <View style={styles.centered}>
           <MatIcon name="wifi-off" size={40} color="#ccc" />
           <Text style={styles.retryText}>{this.state.error}</Text>
-          <TouchableOpacity
-            style={[styles.btn, styles.addBtn, { marginTop: 20, paddingHorizontal: 24, flex: 0 }]}
-            onPress={this.fetchClassrooms}
-          >
+          <TouchableOpacity style={[styles.btn, styles.addBtn, { marginTop: 20, paddingHorizontal: 24, flex: 0 }]} onPress={this.fetchClassrooms}>
             <MatIcon name="refresh" size={18} color="#fff" />
             <Text style={styles.addBtnText}>Retry</Text>
           </TouchableOpacity>
         </View>
       );
-    }
-
-    if (this.state.loading) {
-      return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>;
     }
 
     const { submitAttempted, selectedImage, newTitle, newDesc, editingAssignmentId, existingImageUrl } = this.state;
@@ -289,27 +236,32 @@ export class TeacherAssignments extends Component {
           <Text style={styles.headerSub}>Manage and track student tasks</Text>
         </View>
 
-        <FlatList
-          data={this.state.classrooms}
-          renderItem={this.renderClassItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-        />
+        <ClassroomFilterBar email={user.email} onApply={this.handleFilterApply} />
 
-        {/* View Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={this.state.isViewModalVisible}
-          onRequestClose={() => this.setState({ isViewModalVisible: false })}
-        >
+        {this.state.loading ? (
+          <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+        ) : (
+          <FlatList
+            data={this.state.classrooms}
+            renderItem={this.renderClassItem}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <View style={styles.emptyBox}>
+                <MatIcon name="clipboard-remove-outline" size={60} color="#ccc" />
+                <Text style={[styles.emptyText, { marginTop: 10 }]}>No classrooms match the selected filters.</Text>
+              </View>
+            }
+          />
+        )}
+
+        {/* View Assignments Modal */}
+        <Modal animationType="slide" transparent visible={this.state.isViewModalVisible} onRequestClose={() => this.setState({ isViewModalVisible: false })}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Assignments: {this.state.selectedClassName}</Text>
-                <TouchableOpacity onPress={() => this.setState({ isViewModalVisible: false })}>
-                  <MatIcon name="close-circle" size={28} color="#ccc" />
-                </TouchableOpacity>
+                <TouchableOpacity onPress={() => this.setState({ isViewModalVisible: false })}><MatIcon name="close-circle" size={28} color="#ccc" /></TouchableOpacity>
               </View>
               {this.state.modalLoading ? (
                 <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 50 }} />
@@ -337,92 +289,33 @@ export class TeacherAssignments extends Component {
           </View>
         </Modal>
 
-        {/* Add/Edit Modal */}
-        <Modal
-          visible={this.state.isAddModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={this.closeAddModal}
-        >
+        {/* Add / Edit Modal */}
+        <Modal visible={this.state.isAddModalVisible} animationType="slide" transparent onRequestClose={this.closeAddModal}>
           <View style={styles.modalOverlay}>
-            <KeyboardAvoidingView
-              behavior="padding"
-              style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.92 }]}
-            >
+            <KeyboardAvoidingView behavior="padding" style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.92 }]}>
               <View style={styles.modalHeader}>
                 <View>
                   <Text style={styles.modalTitle}>{editingAssignmentId ? 'Edit Assignment' : 'Create Assignment'}</Text>
                   <Text style={styles.modalSubTitle}>Class: {this.state.selectedClassName}</Text>
                 </View>
-                <TouchableOpacity onPress={this.closeAddModal}>
-                  <MatIcon name="close-circle" size={28} color="#ccc" />
-                </TouchableOpacity>
+                <TouchableOpacity onPress={this.closeAddModal}><MatIcon name="close-circle" size={28} color="#ccc" /></TouchableOpacity>
               </View>
-
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 40 }}
-              >
-                <Text style={styles.label}>
-                  Assignment Title <Text style={{ color: 'red' }}>*</Text>
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    submitAttempted && !newTitle ? { borderColor: '#ff4d4d' } : null,
-                  ]}
-                  value={this.state.newTitle}
-                  onChangeText={(t) => this.setState({ newTitle: t })}
-                  placeholder="e.g. Math Quiz"
-                  placeholderTextColor="#999"
-                />
-
-                <Text style={styles.label}>
-                  Description <Text style={{ color: 'red' }}>*</Text>
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    { height: 75, textAlignVertical: 'top' },
-                    submitAttempted && !newDesc ? { borderColor: '#ff4d4d' } : null,
-                  ]}
-                  multiline
-                  value={this.state.newDesc}
-                  onChangeText={(t) => this.setState({ newDesc: t })}
-                  placeholder="Enter details..."
-                  placeholderTextColor="#999"
-                />
-
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
+                <Text style={styles.label}>Assignment Title <Text style={{ color: 'red' }}>*</Text></Text>
+                <TextInput style={[styles.input, submitAttempted && !newTitle ? { borderColor: '#ff4d4d' } : null]} value={this.state.newTitle} onChangeText={(t) => this.setState({ newTitle: t })} placeholder="e.g. Math Quiz" placeholderTextColor="#999" />
+                <Text style={styles.label}>Description <Text style={{ color: 'red' }}>*</Text></Text>
+                <TextInput style={[styles.input, { height: 75, textAlignVertical: 'top' }, submitAttempted && !newDesc ? { borderColor: '#ff4d4d' } : null]} multiline value={this.state.newDesc} onChangeText={(t) => this.setState({ newDesc: t })} placeholder="Enter details..." placeholderTextColor="#999" />
                 <Text style={styles.label}>Due Date</Text>
-                <TouchableOpacity
-                  style={styles.datePickerBtn}
-                  onPress={() => this.setState({ showDatePicker: true })}
-                >
+                <TouchableOpacity style={styles.datePickerBtn} onPress={() => this.setState({ showDatePicker: true })}>
                   <MatIcon name="calendar-clock" size={20} color={PRIMARY} />
                   <Text style={styles.datePickerText}>{this.state.newDate.toDateString()}</Text>
                 </TouchableOpacity>
-
-                <Text style={styles.label}>
-                  Attachment <Text style={{ color: 'red' }}>*</Text>
-                </Text>
-                <TouchableOpacity
-                  style={[
-                    styles.imagePickBtn,
-                    submitAttempted && !selectedImage && !existingImageUrl ? { borderColor: '#ff4d4d' } : null,
-                  ]}
-                  onPress={this.handlePickImage}
-                >
+                <Text style={styles.label}>Attachment <Text style={{ color: 'red' }}>*</Text></Text>
+                <TouchableOpacity style={[styles.imagePickBtn, submitAttempted && !selectedImage && !existingImageUrl ? { borderColor: '#ff4d4d' } : null]} onPress={this.handlePickImage}>
                   {selectedImage || existingImageUrl ? (
                     <View style={{ width: '100%', height: '100%' }}>
-                      <Image 
-                        source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl }} 
-                        style={styles.previewThumb} 
-                      />
-                      <TouchableOpacity
-                        style={styles.removeImageBtn}
-                        onPress={this.handleRemoveImage}
-                      >
+                      <Image source={{ uri: selectedImage ? selectedImage.uri : existingImageUrl }} style={styles.previewThumb} />
+                      <TouchableOpacity style={styles.removeImageBtn} onPress={this.handleRemoveImage}>
                         <MatIcon name="close-circle" size={22} color="#fff" />
                       </TouchableOpacity>
                     </View>
@@ -433,83 +326,38 @@ export class TeacherAssignments extends Component {
                     </View>
                   )}
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.submitBtn}
-                  onPress={this.handlePostAssignment}
-                  disabled={this.state.uploading}
-                >
-                  {this.state.uploading
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.submitBtnText}>
-                        {editingAssignmentId ? 'Update Assignment' : 'Post Assignment'}
-                      </Text>
-                  }
+                <TouchableOpacity style={styles.submitBtn} onPress={this.handlePostAssignment} disabled={this.state.uploading}>
+                  {this.state.uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{editingAssignmentId ? 'Update Assignment' : 'Post Assignment'}</Text>}
                 </TouchableOpacity>
               </ScrollView>
             </KeyboardAvoidingView>
           </View>
-
-          <DatePicker
-            modal
-            open={this.state.showDatePicker}
-            date={this.state.newDate}
-            mode="date"
-            onConfirm={(date) => this.setState({ showDatePicker: false, newDate: date })}
-            onCancel={() => this.setState({ showDatePicker: false })}
-          />
+          <DatePicker modal open={this.state.showDatePicker} date={this.state.newDate} mode="date" onConfirm={(date) => this.setState({ showDatePicker: false, newDate: date })} onCancel={() => this.setState({ showDatePicker: false })} />
         </Modal>
 
         {/* Full Image Preview Modal */}
-        <Modal
-          visible={!!this.state.previewImage}
-          transparent={true}
-          onRequestClose={() => this.setState({ previewImage: null })}
-        >
+        <Modal visible={!!this.state.previewImage} transparent onRequestClose={() => this.setState({ previewImage: null })}>
           <View style={styles.previewOverlay}>
-            <TouchableOpacity
-              style={styles.previewClose}
-              onPress={() => this.setState({ previewImage: null })}
-            >
+            <TouchableOpacity style={styles.previewClose} onPress={() => this.setState({ previewImage: null })}>
               <MatIcon name="close-circle" size={35} color="#fff" />
             </TouchableOpacity>
-            <ScrollView
-              maximumZoomScale={5}
-              minimumZoomScale={1}
-              contentContainerStyle={styles.scrollViewCentered}
-            >
-              {this.state.previewImage && (
-                <Image
-                  source={{ uri: this.state.previewImage }}
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-              )}
+            <ScrollView maximumZoomScale={5} minimumZoomScale={1} contentContainerStyle={styles.scrollViewCentered}>
+              {this.state.previewImage && <Image source={{ uri: this.state.previewImage }} style={styles.fullImage} resizeMode="contain" />}
             </ScrollView>
           </View>
         </Modal>
 
         {/* Submissions Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={this.state.isSubmissionsModalVisible}
-          onRequestClose={() => this.setState({ isSubmissionsModalVisible: false })}
-        >
+        <Modal animationType="slide" transparent visible={this.state.isSubmissionsModalVisible} onRequestClose={() => this.setState({ isSubmissionsModalVisible: false })}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.85 }]}>
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.modalTitle}>Submissions</Text>
-                  <Text style={styles.modalSubText} numberOfLines={1}>
-                    {this.state.selectedAssignmentTitle}
-                  </Text>
+                  <Text style={styles.modalSubText} numberOfLines={1}>{this.state.selectedAssignmentTitle}</Text>
                 </View>
-                <TouchableOpacity onPress={() => this.setState({ isSubmissionsModalVisible: false })}>
-                  <MatIcon name="close-circle" size={28} color="#ccc" />
-                </TouchableOpacity>
+                <TouchableOpacity onPress={() => this.setState({ isSubmissionsModalVisible: false })}><MatIcon name="close-circle" size={28} color="#ccc" /></TouchableOpacity>
               </View>
-
               {this.state.submissionsLoading ? (
                 <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 50, marginBottom: 50 }} />
               ) : this.state.submissionsError ? (
@@ -522,29 +370,16 @@ export class TeacherAssignments extends Component {
                   data={this.state.submissions}
                   keyExtractor={(item) => item.id.toString()}
                   contentContainerStyle={{ paddingBottom: 20 }}
-                  ListEmptyComponent={
-                    <View style={styles.emptyBox}>
-                      <MatIcon name="account-off-outline" size={40} color="#ccc" />
-                      <Text style={[styles.emptyText, { marginTop: 8 }]}>No submissions yet.</Text>
-                    </View>
-                  }
+                  ListEmptyComponent={<View style={styles.emptyBox}><MatIcon name="account-off-outline" size={40} color="#ccc" /><Text style={[styles.emptyText, { marginTop: 8 }]}>No submissions yet.</Text></View>}
                   renderItem={({ item }) => (
                     <View style={styles.submissionItem}>
-                      <View style={styles.submissionAvatar}>
-                        <Text style={styles.submissionAvatarText}>
-                          {item.studentName?.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
+                      <View style={styles.submissionAvatar}><Text style={styles.submissionAvatarText}>{item.studentName?.charAt(0).toUpperCase()}</Text></View>
                       <View style={styles.submissionInfo}>
                         <Text style={styles.submissionName}>{item.studentName}</Text>
                         <Text style={styles.submissionMeta}>Roll No: {item.rollNo} · {item.submittedDate}</Text>
-                        {item.remarks ? (
-                          <Text style={styles.submissionRemarks} numberOfLines={2}>{item.remarks}</Text>
-                        ) : null}
+                        {item.remarks ? <Text style={styles.submissionRemarks} numberOfLines={2}>{item.remarks}</Text> : null}
                       </View>
-                      <View style={styles.submissionStatusBadge}>
-                        <Text style={styles.submissionStatusText}>{item.status}</Text>
-                      </View>
+                      <View style={styles.submissionStatusBadge}><Text style={styles.submissionStatusText}>{item.status}</Text></View>
                     </View>
                   )}
                 />
@@ -552,7 +387,6 @@ export class TeacherAssignments extends Component {
             </View>
           </View>
         </Modal>
-
       </SafeAreaView>
     );
   }
@@ -578,6 +412,8 @@ const styles = StyleSheet.create({
   viewBtnText: { fontFamily: 'Poppins-Medium', color: PRIMARY, fontSize: 13 },
   addBtn: { backgroundColor: PRIMARY },
   addBtnText: { fontFamily: 'Poppins-Medium', color: '#fff', fontSize: 13 },
+  emptyBox: { alignItems: 'center', marginTop: 30 },
+  emptyText: { fontFamily: 'Poppins-Regular', color: '#999', textAlign: 'center' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
@@ -607,9 +443,6 @@ const styles = StyleSheet.create({
   previewClose: { position: 'absolute', top: 50, right: 25, zIndex: 100 },
   scrollViewCentered: { flexGrow: 1, justifyContent: 'center', alignItems: 'center' },
   fullImage: { width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.8 },
-  emptyBox: { alignItems: 'center', marginTop: 30 },
-  emptyText: { fontFamily: 'Poppins-Regular', color: '#999' },
-  // Submissions
   submissionItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9f9f9', padding: 12, borderRadius: 15, marginBottom: 10 },
   submissionAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
   submissionAvatarText: { fontFamily: 'Poppins-Medium', color: PRIMARY, fontSize: 15 },

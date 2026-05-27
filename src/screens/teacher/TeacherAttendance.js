@@ -3,6 +3,8 @@ import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
+import { ClassroomFilterBar } from '@components/ClassroomFilterBar';
+import { applyClassroomFilters } from '@utils/classroomFilterUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
@@ -13,6 +15,7 @@ export class TeacherAttendance extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      allClassrooms: [],
       classrooms: [],
       attendanceData: [],
       filteredData: [],
@@ -25,12 +28,13 @@ export class TeacherAttendance extends Component {
       selectedClassName: '',
       activeTimeFrame: 'today',
       activeStatus: 'All',
+      activeFilters: {},
       timeFrameLabels: {
-        'today': 'Today',
+        today: 'Today',
         '7days': '7 Days',
         '30days': '30 Days',
-        '365days': 'Year'
-      }
+        '365days': 'Year',
+      },
     };
   }
 
@@ -39,26 +43,32 @@ export class TeacherAttendance extends Component {
   }
 
   fetchClassrooms = async () => {
+    this.setState({ loading: true });
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getClassRooms(user.id, user.email);
-      this.setState({ classrooms: data, loading: false });
+      const filtered = applyClassroomFilters(data, this.state.activeFilters);
+      this.setState({ allClassrooms: data, classrooms: filtered, loading: false });
     } catch (err) {
       this.setState({ loading: false });
     }
   };
 
-  handleViewAttendance = async (classId, className, timeFrame = 'today') => {
-    this.setState({ 
-      isModalVisible: true, 
-      modalLoading: true, 
-      selectedClassId: classId,
-      selectedClassName: className,
-      activeTimeFrame: timeFrame,
-      activeStatus: 'All',
-      showTimeDropdown: false 
-    });
+  handleFilterApply = (filters) => {
+    const filtered = applyClassroomFilters(this.state.allClassrooms, filters);
+    this.setState({ activeFilters: filters, classrooms: filtered });
+  };
 
+  handleViewAttendance = async (classId, className, timeFrame = 'today') => {
+    this.setState({
+      isModalVisible: true, 
+      modalLoading: true,
+      selectedClassId: classId, 
+      selectedClassName: className,
+      activeTimeFrame: timeFrame, 
+      activeStatus: 'All', 
+      showTimeDropdown: false,
+    });
     try {
       const res = await teacherApi.getAttendanceByClass(classId, timeFrame);
       const data = res.content || [];
@@ -70,13 +80,13 @@ export class TeacherAttendance extends Component {
 
   filterByStatus = (status) => {
     const { attendanceData } = this.state;
-    let filtered = status === 'All' ? attendanceData : attendanceData.filter(i => i.status === status);
+    const filtered = status === 'All' ? attendanceData : attendanceData.filter((i) => i.status === status);
     this.setState({ activeStatus: status, filteredData: filtered, showStatusDropdown: false });
   };
 
   getStats = () => {
     const total = this.state.attendanceData.length;
-    const present = this.state.attendanceData.filter(i => i.status === 'Present').length;
+    const present = this.state.attendanceData.filter((i) => i.status === 'Present').length;
     const absent = total - present;
     const rate = total > 0 ? ((present / total) * 100).toFixed(0) : 0;
     return { total, present, absent, rate };
@@ -96,12 +106,11 @@ export class TeacherAttendance extends Component {
             <Text style={[styles.statusText, { color: isPresent ? SUCCESS : DANGER }]}>{item.status}</Text>
           </View>
         </View>
-
         {isPresent && (
           <View style={styles.presentDetailsRow}>
             <View style={styles.detailBox}><MatIcon name="login" size={12} color="#888" /><Text style={styles.detailValue}>In: {item.loginTime || '--:--'}</Text></View>
             <View style={styles.detailBox}><MatIcon name="logout" size={12} color="#888" /><Text style={styles.detailValue}>Out: {item.logoutTime || '--:--'}</Text></View>
-            <View style={styles.detailBox}><MatIcon name="clock-outline" size={12} color={PRIMARY} /><Text style={[styles.detailValue, {color: PRIMARY, fontWeight: 'bold'}]}>{item.workingMinutes}m</Text></View>
+            <View style={styles.detailBox}><MatIcon name="clock-outline" size={12} color={PRIMARY} /><Text style={[styles.detailValue, { color: PRIMARY, fontWeight: 'bold' }]}>{item.workingMinutes}m</Text></View>
           </View>
         )}
       </View>
@@ -109,8 +118,8 @@ export class TeacherAttendance extends Component {
   };
 
   render() {
+    const { user } = useAuthStore.getState();
     const stats = this.getStats();
-    if (this.state.loading) return <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>;
 
     return (
       <SafeAreaView style={styles.container}>
@@ -118,92 +127,97 @@ export class TeacherAttendance extends Component {
           <Text style={styles.subtitle}>Manage classroom presence and history</Text>
         </View>
 
-        <FlatList
-          data={this.state.classrooms}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.iconBox}><MatIcon name="calendar-check" size={24} color={PRIMARY} /></View>
-                <View style={styles.headerInfo}>
-                  <Text style={styles.classTitle}>{item.standard} - {item.division}</Text>
-                  <Text style={styles.classSub}>{item.medium} | {item.year}</Text>
+        <ClassroomFilterBar email={user.email} onApply={this.handleFilterApply} />
+
+        {this.state.loading ? (
+          <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+        ) : (
+          <FlatList
+            data={this.state.classrooms}
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.iconBox}><MatIcon name="calendar-check" size={24} color={PRIMARY} /></View>
+                  <View style={styles.headerInfo}>
+                    <Text style={styles.classTitle}>{item.standard} - {item.division}</Text>
+                    <Text style={styles.classSub}>{item.medium} | {item.year}</Text>
+                  </View>
                 </View>
+                <View style={styles.detailsRow}>
+                  <View style={styles.detailItem}><MatIcon name="clock-outline" size={14} color="#666" /><Text style={styles.detailText}>{item.startTime} - {item.endTime}</Text></View>
+                  <View style={styles.detailItem}><MatIcon name="map-marker-outline" size={14} color="#666" /><Text style={styles.detailText}>{item.branchCode}</Text></View>
+                </View>
+                <TouchableOpacity style={styles.actionButton} onPress={() => this.handleViewAttendance(item.id, `${item.standard} - ${item.division}`)}>
+                  <Text style={styles.buttonText}>View Attendance</Text>
+                  <MatIcon name="chevron-right" size={20} color="#fff" />
+                </TouchableOpacity>
               </View>
-
-              <View style={styles.detailsRow}>
-                <View style={styles.detailItem}><MatIcon name="clock-outline" size={14} color="#666" /><Text style={styles.detailText}>{item.startTime} - {item.endTime}</Text></View>
-                <View style={styles.detailItem}><MatIcon name="map-marker-outline" size={14} color="#666" /><Text style={styles.detailText}>{item.branchCode}</Text></View>
+            )}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={
+              <View style={styles.emptyBox}>
+                <MatIcon name="calendar-remove-outline" size={60} color="#ccc" />
+                <Text style={styles.emptyText}>No classrooms match the selected filters.</Text>
               </View>
+            }
+          />
+        )}
 
-              <TouchableOpacity 
-                style={styles.actionButton} 
-                onPress={() => this.handleViewAttendance(item.id, `${item.standard} - ${item.division}`)}
-              >
-                <Text style={styles.buttonText}>View Attendance</Text>
-                <MatIcon name="chevron-right" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.list}
-        />
-
-        <Modal animationType="slide" transparent={true} visible={this.state.isModalVisible}>
+        {/* Attendance Detail Modal */}
+        <Modal animationType="slide" transparent visible={this.state.isModalVisible}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>{this.state.selectedClassName}</Text>
-                  
-                  {/*  DOUBLE DROPDOWN ROW */}
                   <View style={styles.filtersRow}>
-                    
                     {/* Timeframe Dropdown */}
-                    <View style={{zIndex: 2000}}>
-                        <TouchableOpacity style={styles.dropdownChip} onPress={() => this.setState({ showTimeDropdown: !this.state.showTimeDropdown, showStatusDropdown: false })}>
-                            <Text style={styles.chipLabel}>Time: </Text>
-                            <Text style={styles.chipValue}>{this.state.timeFrameLabels[this.state.activeTimeFrame]}</Text>
-                            <MatIcon name="menu-down" size={16} color={PRIMARY} />
-                        </TouchableOpacity>
-                        {this.state.showTimeDropdown && (
-                            <View style={styles.dropdownMenu}>
-                                {Object.keys(this.state.timeFrameLabels).map((key) => (
-                                    <TouchableOpacity key={key} style={styles.menuItem} onPress={() => this.handleViewAttendance(this.state.selectedClassId, this.state.selectedClassName, key)}>
-                                        <Text style={[styles.menuItemText, this.state.activeTimeFrame === key && { color: PRIMARY, fontWeight: 'bold' }]}>{this.state.timeFrameLabels[key]}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
+                    <View style={{ zIndex: 2000 }}>
+                      <TouchableOpacity style={styles.dropdownChip} onPress={() => this.setState({ showTimeDropdown: !this.state.showTimeDropdown, showStatusDropdown: false })}>
+                        <Text style={styles.chipLabel}>Time: </Text>
+                        <Text style={styles.chipValue}>{this.state.timeFrameLabels[this.state.activeTimeFrame]}</Text>
+                        <MatIcon name="menu-down" size={16} color={PRIMARY} />
+                      </TouchableOpacity>
+                      {this.state.showTimeDropdown && (
+                        <View style={styles.dropdownMenu}>
+                          {Object.keys(this.state.timeFrameLabels).map((key) => (
+                            <TouchableOpacity key={key} style={styles.menuItem} onPress={() => this.handleViewAttendance(this.state.selectedClassId, this.state.selectedClassName, key)}>
+                              <Text style={[styles.menuItemText, this.state.activeTimeFrame === key && { color: PRIMARY, fontWeight: 'bold' }]}>{this.state.timeFrameLabels[key]}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
                     </View>
-
                     {/* Status Dropdown */}
-                    <View style={{zIndex: 2000}}>
-                        <TouchableOpacity style={[styles.dropdownChip, {marginLeft: 8}]} onPress={() => this.setState({ showStatusDropdown: !this.state.showStatusDropdown, showTimeDropdown: false })}>
-                            <Text style={styles.chipLabel}>Status: </Text>
-                            <Text style={styles.chipValue}>{this.state.activeStatus}</Text>
-                            <MatIcon name="menu-down" size={16} color={PRIMARY} />
-                        </TouchableOpacity>
-                        {this.state.showStatusDropdown && (
-                            <View style={[styles.dropdownMenu, {left: 8}]}>
-                                {['All', 'Present', 'Absent'].map((status) => (
-                                    <TouchableOpacity key={status} style={styles.menuItem} onPress={() => this.filterByStatus(status)}>
-                                        <Text style={[styles.menuItemText, this.state.activeStatus === status && { color: PRIMARY, fontWeight: 'bold' }]}>{status}</Text>
-                                    </TouchableOpacity>
-                                ))}
-                            </View>
-                        )}
+                    <View style={{ zIndex: 2000 }}>
+                      <TouchableOpacity style={[styles.dropdownChip, { marginLeft: 8 }]} onPress={() => this.setState({ showStatusDropdown: !this.state.showStatusDropdown, showTimeDropdown: false })}>
+                        <Text style={styles.chipLabel}>Status: </Text>
+                        <Text style={styles.chipValue}>{this.state.activeStatus}</Text>
+                        <MatIcon name="menu-down" size={16} color={PRIMARY} />
+                      </TouchableOpacity>
+                      {this.state.showStatusDropdown && (
+                        <View style={[styles.dropdownMenu, { left: 8 }]}>
+                          {['All', 'Present', 'Absent'].map((status) => (
+                            <TouchableOpacity key={status} style={styles.menuItem} onPress={() => this.filterByStatus(status)}>
+                              <Text style={[styles.menuItemText, this.state.activeStatus === status && { color: PRIMARY, fontWeight: 'bold' }]}>{status}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
                     </View>
-
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => this.setState({ isModalVisible: false, showTimeDropdown: false, showStatusDropdown: false })}><MatIcon name="close-circle" size={30} color="#ccc" /></TouchableOpacity>
+                <TouchableOpacity onPress={() => this.setState({ isModalVisible: false, showTimeDropdown: false, showStatusDropdown: false })}>
+                  <MatIcon name="close-circle" size={30} color="#ccc" />
+                </TouchableOpacity>
               </View>
 
               <View style={styles.statsBar}>
                 <View style={styles.statBox}><Text style={styles.statNum}>{stats.total}</Text><Text style={styles.statSub}>Total</Text></View>
-                <View style={styles.statBox}><Text style={[styles.statNum, {color: SUCCESS}]}>{stats.present}</Text><Text style={styles.statSub}>Present</Text></View>
-                <View style={styles.statBox}><Text style={[styles.statNum, {color: DANGER}]}>{stats.absent}</Text><Text style={styles.statSub}>Absent</Text></View>
-                <View style={styles.statBox}><Text style={[styles.statNum, {color: PRIMARY}]}>{stats.rate}%</Text><Text style={styles.statSub}>Rate</Text></View>
+                <View style={styles.statBox}><Text style={[styles.statNum, { color: SUCCESS }]}>{stats.present}</Text><Text style={styles.statSub}>Present</Text></View>
+                <View style={styles.statBox}><Text style={[styles.statNum, { color: DANGER }]}>{stats.absent}</Text><Text style={styles.statSub}>Absent</Text></View>
+                <View style={styles.statBox}><Text style={[styles.statNum, { color: PRIMARY }]}>{stats.rate}%</Text><Text style={styles.statSub}>Rate</Text></View>
               </View>
 
               {this.state.modalLoading ? (
@@ -236,7 +250,8 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 12, color: '#666' },
   actionButton: { backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderRadius: 12, gap: 8 },
   buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-  
+  emptyBox: { alignItems: 'center', marginTop: 60 },
+  emptyText: { fontFamily: 'Poppins-Regular', color: '#999', textAlign: 'center', marginTop: 10, paddingHorizontal: 30 },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, height: SCREEN_HEIGHT * 0.85, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 },
@@ -248,12 +263,10 @@ const styles = StyleSheet.create({
   dropdownMenu: { position: 'absolute', top: 38, left: 0, backgroundColor: '#fff', borderRadius: 12, width: 130, elevation: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, paddingVertical: 5 },
   menuItem: { paddingHorizontal: 15, paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0' },
   menuItemText: { fontSize: 13, color: '#444' },
-
   statsBar: { flexDirection: 'row', backgroundColor: '#f8f9fe', borderRadius: 15, padding: 15, marginBottom: 15 },
   statBox: { flex: 1, alignItems: 'center' },
   statNum: { fontSize: 17, fontWeight: 'bold', color: '#1a1a2e' },
   statSub: { fontSize: 10, color: '#999', marginTop: 2 },
-
   studentCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f0f0f0' },
   cardMain: { flexDirection: 'row', alignItems: 'center' },
   rollNoText: { fontSize: 13, fontWeight: 'bold', color: '#bbb', width: 35 },
@@ -263,7 +276,7 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 10, fontWeight: 'bold' },
   presentDetailsRow: { flexDirection: 'row', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f8f8f8', justifyContent: 'space-between' },
   detailBox: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  detailValue: { fontSize: 11, color: '#666' }
+  detailValue: { fontSize: 11, color: '#666' },
 });
 
 export default TeacherAttendance;
