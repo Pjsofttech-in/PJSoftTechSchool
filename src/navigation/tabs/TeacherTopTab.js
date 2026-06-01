@@ -3,6 +3,7 @@ import {View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import {useNavigation} from '@react-navigation/native';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 
 // Screens
 import TeacherDashboard from '@screens/teacher/TeacherDashboard';
@@ -14,37 +15,23 @@ import TeacherProfile from '@screens/teacher/TeacherProfile';
 const Tab = createMaterialTopTabNavigator();
 
 const tabs = [
-  {
-    name: 'Home',
-    activeIcon: 'home',
-    inactiveIcon: 'home-outline',
-  },
-  {
-    name: 'ClassRoom',
-    activeIcon: 'google-classroom',
-    inactiveIcon: 'google-classroom',
-  },
-  {
-    name: 'Attendance',
-    activeIcon: 'calendar-check',
-    inactiveIcon: 'calendar-check-outline',
-  },
-  {
-    name: 'Assignments',
-    activeIcon: 'clipboard-text',
-    inactiveIcon: 'clipboard-text-outline',
-  },
-  {
-    name: 'Profile',
-    activeIcon: 'account-circle',
-    inactiveIcon: 'account-circle-outline',
-  },
+  { name: 'Home', activeIcon: 'home', inactiveIcon: 'home-outline' },
+  { name: 'ClassRoom', activeIcon: 'google-classroom', inactiveIcon: 'google-classroom' },
+  { name: 'Attendance', activeIcon: 'calendar-check', inactiveIcon: 'calendar-check-outline' },
+  { name: 'Assignments', activeIcon: 'clipboard-text', inactiveIcon: 'clipboard-text-outline' },
+  { name: 'Profile', activeIcon: 'account-circle', inactiveIcon: 'account-circle-outline' },
 ];
 
-// App Bar
 const AppBar = ({screenName, onHamburgerPress}) => {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.appBar}>
+    <View style={[
+      styles.appBar, 
+      { 
+        paddingTop: insets.top, 
+        height: 56 + insets.top 
+      }
+    ]}>
       <TouchableOpacity
         onPress={onHamburgerPress}
         style={styles.hamburger}
@@ -56,10 +43,17 @@ const AppBar = ({screenName, onHamburgerPress}) => {
   );
 };
 
-// Tab Bar
 const CustomTabBar = ({state, navigation}) => {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.tabBar}>
+    <View style={[
+      styles.tabBar, 
+      { 
+        paddingBottom: insets.bottom, 
+        height: 56 + insets.bottom 
+      }
+    ]}>
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
         const tab = tabs.find(t => t.name === route.name);
@@ -101,9 +95,7 @@ const CustomTabBar = ({state, navigation}) => {
 };
 
 const styles = StyleSheet.create({
-  // App Bar
   appBar: {
-    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
@@ -122,14 +114,11 @@ const styles = StyleSheet.create({
     color: '#202124',
     marginLeft: 8,
   },
-
-  // Tab Bar
   tabBar: {
     flexDirection: 'row',
     backgroundColor: '#ffffff',
     borderTopWidth: 0.5,
     borderTopColor: '#7b68ee',
-    height: 56,
     elevation: 0,
   },
   tabItem: {
@@ -146,9 +135,8 @@ const styles = StyleSheet.create({
   },
 });
 
-export default function TeacherTopTab() {
+function TeacherTopTabContent() {
   const [currentScreen, setCurrentScreen] = React.useState('Home');
-
   const navigation = useNavigation();
 
   const handleHamburger = () => {
@@ -156,7 +144,7 @@ export default function TeacherTopTab() {
   };
 
   return (
-    <View style={{flex: 1}}>
+    <View style={{flex: 1, backgroundColor: '#ffffff'}}>
       {/* App Bar */}
       <AppBar
         screenName={currentScreen}
@@ -185,5 +173,13 @@ export default function TeacherTopTab() {
         <Tab.Screen name="Profile" component={TeacherProfile} />
       </Tab.Navigator>
     </View>
+  );
+}
+
+export default function TeacherTopTab() {
+  return (
+    <SafeAreaProvider>
+      <TeacherTopTabContent />
+    </SafeAreaProvider>
   );
 }

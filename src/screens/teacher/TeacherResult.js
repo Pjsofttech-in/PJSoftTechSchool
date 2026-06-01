@@ -1,23 +1,22 @@
 import React, { Component } from 'react';
-import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, Modal, Dimensions, ScrollView } from 'react-native';
+import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Modal, Dimensions, ScrollView } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
 
-export class TeacherResult extends Component {
+class TeacherResultContent extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      // Classrooms
       classrooms: [],
       loading: true,
       error: null,
 
-      // Exams Modal
       isExamsModalVisible: false,
       exams: [],
       examsLoading: false,
@@ -25,7 +24,6 @@ export class TeacherResult extends Component {
       selectedClassId: null,
       selectedClassName: '',
 
-      // Results Modal
       isResultsModalVisible: false,
       results: [],
       resultsLoading: false,
@@ -39,7 +37,6 @@ export class TeacherResult extends Component {
     this.fetchClassrooms();
   }
 
-  // Fetch Classrooms
   fetchClassrooms = async () => {
     this.setState({ loading: true, error: null });
     try {
@@ -52,7 +49,6 @@ export class TeacherResult extends Component {
     }
   };
 
-  // Fetch Exams for selected class
   fetchExams = async (classId, className) => {
     this.setState({
       isExamsModalVisible: true,
@@ -72,7 +68,6 @@ export class TeacherResult extends Component {
     }
   };
 
-  // Fetch Results for selected exam 
   fetchResults = async (examId, examName) => {
     this.setState({
       isResultsModalVisible: true,
@@ -92,7 +87,6 @@ export class TeacherResult extends Component {
     }
   };
 
-  // Render: Classroom Card
   renderClassItem = ({ item }) => (
     <View style={styles.card}>
       <View style={styles.infoSection}>
@@ -114,11 +108,9 @@ export class TeacherResult extends Component {
     </View>
   );
 
-  // Render: Exam Card
   renderExamItem = ({ item }) => (
     <View style={styles.examCard}>
       <View style={styles.examHeader}>
-        {/* Exam type badge */}
         <View style={[styles.examTypeBadge, this.getExamTypeBadgeStyle(item.examType)]}>
           <Text style={[styles.examTypeText, this.getExamTypeTextStyle(item.examType)]}>
             {item.examType}
@@ -133,7 +125,6 @@ export class TeacherResult extends Component {
         </View>
       </View>
 
-      {/* Subjects list */}
       <View style={styles.subjectsRow}>
         {item.subjects.map((sub) => (
           <View key={sub.id} style={styles.subjectChip}>
@@ -142,7 +133,6 @@ export class TeacherResult extends Component {
         ))}
       </View>
 
-      {/* Show Result button */}
       <TouchableOpacity
         style={styles.showResultBtn}
         onPress={() => this.fetchResults(item.id, item.examName)}
@@ -153,14 +143,12 @@ export class TeacherResult extends Component {
     </View>
   );
 
-  // Render: Student Result Row
   renderResultItem = ({ item }) => {
     const notAttempted = item.overAllStatus === 'Not Attempted';
     const passed = item.overAllStatus === 'Pass';
 
     return (
       <View style={styles.resultItem}>
-        {/* Student name + roll */}
         <View style={styles.resultLeft}>
           <View style={styles.studentAvatar}>
             <Text style={styles.studentAvatarText}>
@@ -174,7 +162,6 @@ export class TeacherResult extends Component {
                 {item.totalObtained}/{item.totalMax} · {item.percentage}%
               </Text>
             )}
-            {/* Subject-wise breakdown */}
             {item.details && item.details.length > 0 && (
               <View style={{ marginTop: 4 }}>
                 {item.details.map((d, i) => (
@@ -187,7 +174,6 @@ export class TeacherResult extends Component {
           </View>
         </View>
 
-        {/* Status badge */}
         <View style={[
           styles.statusBadge,
           notAttempted ? styles.statusNA : passed ? styles.statusPass : styles.statusFail
@@ -203,7 +189,6 @@ export class TeacherResult extends Component {
     );
   };
 
-  // Helpers
   getExamTypeBadgeStyle = (type) => {
     if (type === 'Final') return { backgroundColor: '#ffe4e4' };
     if (type === 'Semester') return { backgroundColor: '#e4f0ff' };
@@ -216,15 +201,13 @@ export class TeacherResult extends Component {
     return { color: '#43a047' };
   };
 
-  // Render
   render() {
     const { classrooms, loading, error } = this.state;
-    const { navigation } = this.props;
+    const { navigation, insets } = this.props;
 
-    // Error state with retry
     if (error) {
       return (
-        <View style={styles.centered}>
+        <View style={[styles.centered, { paddingTop: insets.top }]}>
           <MatIcon name="wifi-off" size={40} color="#ccc" />
           <Text style={{ color: '#999', marginTop: 12, textAlign: 'center' }}>{error}</Text>
           <TouchableOpacity
@@ -247,18 +230,17 @@ export class TeacherResult extends Component {
     }
 
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
 
-        {/* Appbar */}
-        <View style={styles.appbar}>
+        <View style={[styles.appbar, { paddingTop: Math.max(12, insets.top) }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
             activeOpacity={0.8}
-            >
-              <MatIcon name="arrow-left" size={22} color={PRIMARY} />
+          >
+            <MatIcon name="arrow-left" size={22} color={PRIMARY} />
           </TouchableOpacity>
-            <Text style={styles.appbartitle}>Result</Text>
+          <Text style={styles.appbartitle}>Result</Text>
         </View>
         
         {/* Header */}
@@ -271,7 +253,7 @@ export class TeacherResult extends Component {
           data={classrooms}
           renderItem={this.renderClassItem}
           keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listPadding}
+          contentContainerStyle={[styles.listPadding, { paddingBottom: insets.bottom + 16 }]}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
               <MatIcon name="school-outline" size={40} color="#ccc" />
@@ -288,7 +270,13 @@ export class TeacherResult extends Component {
           onRequestClose={() => this.setState({ isExamsModalVisible: false })}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.85 }]}>
+            <View style={[
+              styles.modalContent, 
+              { 
+                maxHeight: SCREEN_HEIGHT * 0.85,
+                paddingBottom: insets.bottom + 20 
+              }
+            ]}>
               <View style={styles.modalHeader}>
                 <View>
                   <Text style={styles.modalTitle}>Exams</Text>
@@ -332,7 +320,13 @@ export class TeacherResult extends Component {
           onRequestClose={() => this.setState({ isResultsModalVisible: false })}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.90 }]}>
+            <View style={[
+              styles.modalContent, 
+              { 
+                maxHeight: SCREEN_HEIGHT * 0.90,
+                paddingBottom: insets.bottom + 20
+              }
+            ]}>
               <View style={styles.modalHeader}>
                 <View style={{ flex: 1, marginRight: 10 }}>
                   <Text style={styles.modalTitle} numberOfLines={1}>{this.state.selectedExamName}</Text>
@@ -368,7 +362,7 @@ export class TeacherResult extends Component {
           </View>
         </Modal>
 
-      </SafeAreaView>
+      </View>
     );
   }
 }
@@ -376,16 +370,13 @@ export class TeacherResult extends Component {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fe' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  //
-  appbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#ffffff', gap: 12, },
+  appbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, backgroundColor: '#ffffff', gap: 12 },
   backBtn: { padding: 4, borderRadius: 8, backgroundColor: '#ede9ff' },
-  appbartitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: '#1a1a2e', },
-  //
+  appbartitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: '#1a1a2e' },
   header: { paddingVertical: 10, paddingHorizontal: 20, backgroundColor: '#fff', elevation: 2 },
   headerSub: { fontSize: 11, color: '#888', marginTop: 4 },
   listPadding: { padding: 16 },
-  // Classroom Card 
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, },
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10 },
   infoSection: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   badge: { width: 45, height: 45, borderRadius: 12, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
   badgeText: { color: PRIMARY, fontWeight: 'bold', fontSize: 14 },
@@ -394,13 +385,11 @@ const styles = StyleSheet.create({
   classSub: { fontSize: 12, color: '#666', marginTop: 2 },
   button: { backgroundColor: PRIMARY, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 12, gap: 8 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-  // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#1a1a2e' },
   modalSub: { fontSize: 12, color: '#999', marginTop: 2 },
-  // Exam Card
   examCard: { backgroundColor: '#f9f9f9', borderRadius: 15, padding: 14, marginBottom: 12 },
   examHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   examTypeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
@@ -413,7 +402,6 @@ const styles = StyleSheet.create({
   subjectChipText: { fontSize: 11, color: PRIMARY, fontWeight: '500' },
   showResultBtn: { backgroundColor: PRIMARY, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 10, borderRadius: 12, gap: 8 },
   showResultBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  // Result Item
   resultItem: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#f9f9f9', padding: 12, borderRadius: 15, marginBottom: 10, justifyContent: 'space-between' },
   resultLeft: { flexDirection: 'row', flex: 1, alignItems: 'flex-start' },
   studentAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
@@ -429,9 +417,17 @@ const styles = StyleSheet.create({
   statusPassText: { color: '#2e7d32' },
   statusFailText: { color: '#c62828' },
   statusNAText: { color: '#999' },
-  // Empty
   emptyBox: { alignItems: 'center', marginTop: 40, marginBottom: 20 },
   emptyText: { color: '#999', marginTop: 8, fontSize: 13, textAlign: 'center' },
 });
 
-export default TeacherResult;
+export default function TeacherResult() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  return (
+    <SafeAreaProvider>
+      <TeacherResultContent navigation={navigation} insets={insets} />
+    </SafeAreaProvider>
+  );
+}
