@@ -4,6 +4,7 @@ import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Theme
 const PRIMARY = '#7b68ee';
@@ -123,7 +124,6 @@ const FeeCard = ({fee, index}) => {
 
   return (
     <View style={styles.feeCard}>
-
       {/* Fee card header */}
       <View style={styles.feeCardHeader}>
         <View style={styles.feeCardHeaderLeft}>
@@ -254,6 +254,8 @@ const StudentFees = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const navigation = useNavigation();
+  
+  const insets = useSafeAreaInsets();
 
   const fetchFees = useCallback(async () => {
     try {
@@ -288,22 +290,22 @@ const StudentFees = () => {
   const totalPaid = fees.reduce((s, f) => s + (f.paidAmount ?? 0), 0);
   const totalPending = fees.reduce((s, f) => s + (f.pendingAmount ?? 0), 0);
 
-  // Loading
+  // Loading View
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
         <ActivityIndicator size="large" color={PRIMARY} />
         <Text style={styles.loadingText}>Loading fees…</Text>
       </View>
     );
   }
 
-  // Error
+  // Error View
   if (error) {
     return (
-      <View style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <View style={[styles.centered, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
         <MatIcon name="alert-circle-outline" size={48} color={ORANGE} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchFees}>
@@ -313,12 +315,12 @@ const StudentFees = () => {
     );
   }
 
-  // show no data when not loading and not refreshing
+  // Empty View
   if (!loading && !refreshing && fees.length === 0) {
     return (
-      <View style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
-        <MatIcon name="cash-remove" size={48} color={GREY_2} />
+      <View style={[styles.centered, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
+        <MatIcon name="cash-remove" size={48} color={TEXT_LIGHT} />
         <Text style={styles.errorText}>No fee records found.</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchFees}>
           <Text style={styles.retryText}>Retry</Text>
@@ -329,18 +331,20 @@ const StudentFees = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
 
-      {/* Header Section */}
-      <View style={styles.header}>
+      <View style={[
+        styles.header, 
+        { paddingTop: Math.max(12, insets.top) }
+      ]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
             activeOpacity={0.8}
-            >
+          >
               <MatIcon name="arrow-left" size={22} color={PRIMARY} />
           </TouchableOpacity>
-            <Text style={styles.headerTitle}>Fees Details</Text>
+          <Text style={styles.headerTitle}>Fees Details</Text>
       </View>
 
       {/* Overall Summary Strip */}
@@ -369,9 +373,11 @@ const StudentFees = () => {
         </View>
       </View>
 
-      {/* Fee Records */}
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: insets.bottom + 20 }
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -384,7 +390,6 @@ const StudentFees = () => {
         {fees.map((fee, index) => (
           <FeeCard key={fee.fid ?? index} fee={fee} index={index} />
         ))}
-        <View style={styles.bottomPad} />
       </ScrollView>
     </View>
   );
@@ -393,20 +398,15 @@ const StudentFees = () => {
 // Styles
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: GREY_1},
-  // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: WHITE, gap: 8, },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, backgroundColor: WHITE, gap: 8, },
   backBtn: { padding: 4, borderRadius: 8, backgroundColor: PRIMARY_LIGHT },
   headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
-  // Overall summary card
   overallCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
-  // Summary items
   summaryItem: { flex: 1, alignItems: 'center'},
   summaryVal: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 20, },
   summaryLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
   summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4, },
-  // Scroll
   scroll: {padding: 12, paddingTop: 14},
-  // Fee card
   feeCard: { backgroundColor: WHITE, borderRadius: 14, marginBottom: 12, overflow: 'hidden', elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 4, },
   feeCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 12, paddingBottom: 8, },
   feeCardHeaderLeft: { flex: 1, marginRight: 8},
@@ -414,32 +414,26 @@ const styles = StyleSheet.create({
   feeCardSub: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginTop: 1, },
   statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, },
   statusText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', },
-  // Progress bar
   progressWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 10, gap: 8, },
   progressBg: { flex: 1, height: 6, backgroundColor: GREY_2, borderRadius: 3, overflow: 'hidden', },
   progressFill: { height: '100%', borderRadius: 3, },
   progressPct: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: TEXT_MID, minWidth: 30, textAlign: 'right', },
-  // Summary strip inside fee card
   summaryStrip: { flexDirection: 'row', backgroundColor: GREY_1, marginHorizontal: 12, borderRadius: 10, paddingVertical: 8, marginBottom: 10, },
-  // Section card
   card: { marginHorizontal: 12, marginBottom: 10, borderRadius: 10, overflow: 'hidden', borderWidth: 0.5, borderColor: GREY_2, },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 8, backgroundColor: PRIMARY_LIGHT, },
   cardHeaderLeft: {flexDirection: 'row', alignItems: 'center', gap: 6},
   cardIconWrap: { width: 22, height: 22, borderRadius: 5, backgroundColor: WHITE, alignItems: 'center', justifyContent: 'center', },
   cardTitle: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: PRIMARY_DARK, },
   cardBody: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: WHITE, },
-  // Grid
   gridRow: { flexDirection: 'row', gap: 6, marginBottom: 4},
   gridCell: { flex: 1, backgroundColor: GREY_1, borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5, },
   gridLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
   gridValue: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 1, },
-  // Loading / Error
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, padding: 24 },
   loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
   errorText: { color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 12, marginBottom: 16, },
   retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 9, borderRadius: 20, },
   retryText: { color: WHITE, fontFamily: 'Poppins-SemiBold', fontSize: 13, },
-  bottomPad: { height: 20},
 });
 
 export default StudentFees;

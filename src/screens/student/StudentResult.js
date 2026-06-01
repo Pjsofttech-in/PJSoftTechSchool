@@ -4,6 +4,7 @@ import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Theme
 const PRIMARY = '#7b68ee';
@@ -119,19 +120,18 @@ const ResultCard = ({result, index}) => {
 
   return (
     <View style={styles.resultCard}>
-
       {/* Card Header */}
       <TouchableOpacity
         activeOpacity={0.85}
         style={styles.resultCardHeader}
         onPress={() => setOpen(o => !o)}>
 
-        {/* Left  grade circle */}
+        {/* Left grade circle */}
         <View style={[styles.gradeCircle, {borderColor: g.color}]}>
           <Text style={[styles.gradeCircleText, {color: g.color}]}>{g.grade}</Text>
         </View>
 
-        {/* Middle  exam info */}
+        {/* Middle exam info */}
         <View style={styles.resultCardMid}>
           <Text style={styles.examName} numberOfLines={1}>
             {result.examName?.trim()}
@@ -198,6 +198,7 @@ const StudentResult = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   const fetchResults = useCallback(async () => {
     try {
@@ -243,22 +244,22 @@ const StudentResult = () => {
       ? Math.max(...results.map(r => r.percentage ?? 0)).toFixed(1)
       : '0';
 
-  // Loading
+  // Loading View
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <View style={[styles.centered, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
         <ActivityIndicator size="large" color={PRIMARY} />
         <Text style={styles.loadingText}>Loading results…</Text>
       </View>
     );
   }
 
-  // Error
+  // Error View
   if (error) {
     return (
-      <View style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <View style={[styles.centered, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
         <MatIcon name="alert-circle-outline" size={48} color={ORANGE} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchResults}>
@@ -268,13 +269,13 @@ const StudentResult = () => {
     );
   }
 
-  // No data
+  // Empty View
   if (!loading && !refreshing && results.length === 0) {
     return (
-      <View style={styles.centered}>
-        <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
-        <MatIcon name="clipboard-text-off-outline" size={48} color={GREY_2} />
-        <Text style={styles.errorText}>No results found.</Text>
+      <View style={[styles.centered, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
+        <MatIcon name="clipboard-text-off-outline" size={48} color={TEXT_LIGHT} />
+        <Text style={styles.errorText}>No academic records or exam results found yet.</Text>
         <TouchableOpacity style={styles.retryBtn} onPress={fetchResults}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
@@ -284,18 +285,20 @@ const StudentResult = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
 
-      {/** Header Section */}
-      <View style={styles.header}>
+      <View style={[
+        styles.header, 
+        { paddingTop: Math.max(12, insets.top) }
+      ]}>
         <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={styles.backBtn}
-        activeOpacity={0.8}
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          activeOpacity={0.8}
         >
           <MatIcon name="arrow-left" size={22} color={PRIMARY} />
         </TouchableOpacity>
-          <Text style={styles.headerTitle}>Academic Results</Text>
+        <Text style={styles.headerTitle}>Academic Results</Text>
       </View>
 
       {/* Summary Strip */}
@@ -325,9 +328,12 @@ const StudentResult = () => {
 
       {/* Result list */}
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll, 
+          { paddingBottom: insets.bottom + 20 }
+        ]}
         showsVerticalScrollIndicator={false}
-        refreshControl={
+        refreshControl = {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
@@ -338,7 +344,6 @@ const StudentResult = () => {
         {results.map((result, index) => (
           <ResultCard key={result.id ?? index} result={result} index={index} />
         ))}
-        <View style={styles.bottomPad} />
       </ScrollView>
     </View>
   );
@@ -347,42 +352,33 @@ const StudentResult = () => {
 // Styles 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: GREY_1 },
-  // Header
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, backgroundColor: WHITE, gap: 8, },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, backgroundColor: WHITE, gap: 8, },
   backBtn: { padding: 4, borderRadius: 8, backgroundColor: PRIMARY_LIGHT },
   headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
-  // Summary strip
   summaryCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, }, 
   summaryItem: { flex: 1, alignItems: 'center'},
   summaryVal: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 20, },
   summaryLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
   summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4, },
-  // Scroll
   scroll: { padding: 12, paddingTop: 14 },
-  // Result card
   resultCard: { backgroundColor: WHITE, borderRadius: 14, marginBottom: 10, overflow: 'hidden', elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 4, },
   resultCardHeader: { flexDirection: 'row', alignItems: 'center', padding: 12, paddingBottom: 8, gap: 10, },
-  // Grade circle
   gradeCircle: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
   gradeCircleText: { fontSize: 13, fontFamily: 'Poppins-SemiBold', },
-  // Card middle
   resultCardMid: { flex: 1},
   examName: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 3, },
   examMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, },
   examTypeBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, },
   examTypeText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', },
   examMarks: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
-  // Card right
   resultCardRight: { alignItems: 'center', gap: 3, },
   pctText: { fontSize: 14, fontFamily: 'Poppins-SemiBold', lineHeight: 18, },
   statusBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8, },
   statusText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', },
-  // Progress bar 
   progressWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingBottom: 10, gap: 8, },
   progressBg: { flex: 1, height: 5, backgroundColor: GREY_2, borderRadius: 3, overflow: 'hidden', },
   progressFill: { height: '100%', borderRadius: 3, },
   progressPct: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: TEXT_MID, minWidth: 28, textAlign: 'right', },
-  // Subject list
   subjectList: { borderTopWidth: 0.5, borderTopColor: GREY_2, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: GREY_1, },
   subjectHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: GREY_2, marginBottom: 4, },
   subjectHeaderText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: TEXT_LIGHT, flex: 1, textAlign: 'center', },
@@ -395,13 +391,11 @@ const styles = StyleSheet.create({
   gradeText: { fontSize: 13, fontFamily: 'Poppins-SemiBold', },
   miniStatusBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, },
   miniStatusText: { fontSize: 9, fontFamily: 'Poppins-SemiBold', },
-  // Loading / Error
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, padding: 24 },
   loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
   errorText: { color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 12, marginBottom: 16, },
   retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 9, borderRadius: 20, },
   retryText: { color: WHITE, fontFamily: 'Poppins-SemiBold', fontSize: 13, },
-  bottomPad: { height: 20 }, 
 });
 
 export default StudentResult;
