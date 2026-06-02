@@ -19,11 +19,11 @@ const roles = [
     label: 'Continue as Student',
     color: '#34a853',
   },
-  // {
-  //   id: 'parent',
-  //   label: 'Continue as Parent',
-  //   color: '#fa7b17',
-  // },
+  {
+    id: 'parent',
+    label: 'Continue as Parent',
+    color: '#fa7b17',
+  },
 ];
 
 const RoleSelectScreen = ({navigation}) => {
