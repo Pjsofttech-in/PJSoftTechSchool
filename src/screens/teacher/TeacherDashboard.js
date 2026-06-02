@@ -26,7 +26,18 @@ export class TeacherDashboard extends Component {
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getNotifications(user.email);
-      this.setState({ notices: data, loading: false });
+      
+      const sortedNotices = data.sort((a, b) => {
+        const dateDiff = new Date(b.createdAt) - new Date(a.createdAt);
+        
+        if (dateDiff === 0 && b.id && a.id) {
+          return b.id - a.id; 
+        }
+        
+        return dateDiff;
+      });
+      
+      this.setState({ notices: sortedNotices, loading: false });
     } catch (err) {
       this.setState({ loading: false });
     }
@@ -152,8 +163,8 @@ const styles = StyleSheet.create({
   modalDate: { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: PRIMARY, textTransform: 'uppercase', marginBottom: 4 },
   modalTitle: { fontFamily: 'Poppins-Bold', fontSize: 18, color: '#1a1a2e', marginBottom: 12 },
   modalDesc: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#444', lineHeight: 20 },
-  closeButton: { backgroundColor: '#f1f1f5', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 15, },
-  closeButtonText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#333' },
+  closeButton: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: PRIMARY, paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 15, },
+  closeButtonText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: PRIMARY },
 });
 
 export default TeacherDashboard;
