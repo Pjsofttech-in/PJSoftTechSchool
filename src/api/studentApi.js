@@ -172,4 +172,38 @@ export const studentApi = {
     }
   },
    
+  // 1. Get notifications by branch code
+  getNotifications: async (role, email, branchCode) => {
+    try {
+      if (!role || !email || !branchCode) {
+        throw new Error('Role, email, and branchCode are required.');
+      }
+      const response = await api.get('/getNotificationByBranchCode', {
+        params: { role, email, branchCode },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch branch notifications.';
+      console.error(`[StudentApi] getNotifications failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
+  // 2. Get notifications by classroom ID
+  getNotificationByClassroom: async (role, email, classId) => {
+    try {
+      if (!role || !email || !classId) {
+        throw new Error('Role, email, and classId are required.');
+      }
+      const response = await api.get('/getNotificationByClassRoom', {
+        params: { role, email, classId },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to fetch classroom notifications.';
+      console.error(`[StudentApi] getNotificationByClassroom failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+  
 };

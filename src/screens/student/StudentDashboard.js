@@ -1,9 +1,11 @@
-import React, {useEffect, useState, useCallback} from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Linking } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Linking, FlatList, Modal, Dimensions } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
-import {useNavigation} from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import useAuthStore from '@store/authStore';
-import {studentApi} from '@api/studentApi';
+import { studentApi } from '@api/studentApi';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Theme
 const PRIMARY = '#7b68ee';
@@ -30,7 +32,7 @@ const formatDate = date => {
 
 const fmt = val =>
   val != null && val !== 0
-    ? `₹${Number(val).toLocaleString('en-IN', {minimumFractionDigits: 0})}`
+    ? `₹${Number(val).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`
     : '₹0';
 
 const getDaysInfo = dueDateStr => {
@@ -44,21 +46,21 @@ const getDaysInfo = dueDateStr => {
 };
 
 // Stat Card
-const StatCard = ({icon, label, value, color, bg, onPress}) => (
+const StatCard = ({ icon, label, value, color, bg, onPress }) => (
   <TouchableOpacity
-    style={[styles.statCard, {backgroundColor: bg}]}
+    style={[styles.statCard, { backgroundColor: bg }]}
     onPress={onPress}
     activeOpacity={0.8}>
-    <View style={[styles.statIconWrap, {backgroundColor: color + '22'}]}>
+    <View style={[styles.statIconWrap, { backgroundColor: color + '22' }]}>
       <MatIcon name={icon} size={22} color={color} />
     </View>
-    <Text style={[styles.statVal, {color}]}>{value}</Text>
+    <Text style={[styles.statVal, { color }]}>{value}</Text>
     <Text style={styles.statLabel}>{label}</Text>
   </TouchableOpacity>
 );
 
 // Section Header
-const SectionHeader = ({title, icon, onPress}) => (
+const SectionHeader = ({ title, icon, onPress }) => (
   <View style={styles.sectionHeader}>
     <View style={styles.sectionHeaderLeft}>
       <MatIcon name={icon} size={16} color={PRIMARY} />
@@ -73,7 +75,7 @@ const SectionHeader = ({title, icon, onPress}) => (
 
 // Main Screen
 const StudentDashboard = () => {
-  const {user} = useAuthStore();
+  const { user } = useAuthStore();
   const navigation = useNavigation();
 
   const [loading, setLoading] = useState(true);
@@ -84,6 +86,11 @@ const StudentDashboard = () => {
   const [feesData, setFeesData] = useState(null);
   const [resultsData, setResultsData] = useState(null);
   const [assignmentsData, setAssignmentsData] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  
+  // UI states
+  const [modalVisible, setModalVisible] = useState(false);
+  const [activeNoticeIndex, setActiveNoticeIndex] = useState(0);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -95,7 +102,9 @@ const StudentDashboard = () => {
         user?.email
       );
 
-      const [attendance, fees, results, assignments] = await Promise.allSettled([
+      const classId = student?.classsRoomId;
+
+      const [attendance, fees, results, assignments, branchNotices, classNotices] = await Promise.allSettled([
         // Today's attendance
         studentApi.getAttendance(user?.id, 'today', today, today, 0, 1),
         // Fees
@@ -103,7 +112,13 @@ const StudentDashboard = () => {
         // Results
         studentApi.getStudentResults(user?.id, user?.role, user?.email),
         // Assignments
-        studentApi.getAssignments(student?.classsRoomId, user?.role, user?.email),
+        studentApi.getAssignments(classId, user?.role, user?.email),
+        // Branch Notifications
+        studentApi.getNotifications(user?.role, user?.email, user?.branchCode),
+        // Classroom Notifications
+        classId 
+          ? studentApi.getNotificationByClassroom(user?.role, user?.email, classId)
+          : Promise.resolve([]),
       ]);
 
       // Attendance
@@ -118,7 +133,7 @@ const StudentDashboard = () => {
         const totalFees = data.reduce((s, f) => s + (f.totalamount ?? 0), 0);
         const totalPaid = data.reduce((s, f) => s + (f.paidAmount ?? 0), 0);
         const totalPending = data.reduce((s, f) => s + (f.pendingAmount ?? 0), 0);
-        setFeesData({totalFees, totalPaid, totalPending});
+        setFeesData({ totalFees, totalPaid, totalPending });
       }
 
       // Results
@@ -128,7 +143,7 @@ const StudentDashboard = () => {
           data.length > 0
             ? data.reduce((s, r) => s + (r.percentage ?? 0), 0) / data.length
             : 0;
-        setResultsData({total: data.length, avg: avg.toFixed(1)});
+        setResultsData({ total: data.length, avg: avg.toFixed(1) });
       }
 
       // Assignments
@@ -136,8 +151,23 @@ const StudentDashboard = () => {
         const data = Array.isArray(assignments.value) ? assignments.value : [];
         const overdue = data.filter(a => getDaysInfo(a.dueDate) === 'overdue').length;
         const dueToday = data.filter(a => getDaysInfo(a.dueDate) === 'today').length;
-        setAssignmentsData({total: data.length, overdue, dueToday});
+        setAssignmentsData({ total: data.length, overdue, dueToday });
       }
+
+      // Combine & sort both notification
+      let combinedNotices = [];
+      if (branchNotices.status === 'fulfilled' && Array.isArray(branchNotices.value)) {
+        combinedNotices = [...combinedNotices, ...branchNotices.value];
+      }
+      if (classNotices.status === 'fulfilled' && Array.isArray(classNotices.value)) {
+        combinedNotices = [...combinedNotices, ...classNotices.value];
+      }
+
+      if (combinedNotices.length > 0) {
+        combinedNotices.sort((a, b) => b.id - a.id);
+      }
+      setNotifications(combinedNotices);
+
     } catch (e) {
       console.error('[Dashboard] fetchAll error:', e.message);
     } finally {
@@ -155,7 +185,6 @@ const StudentDashboard = () => {
     fetchAll();
   };
 
-  // Greeting
   const getGreeting = () => {
     const h = new Date().getHours();
     if (h < 12) return 'Good Morning';
@@ -163,17 +192,22 @@ const StudentDashboard = () => {
     return 'Good Evening';
   };
 
-  // Attendance status style
   const getAttendanceStyle = status => {
     switch (status?.toLowerCase()) {
-      case 'present': return {color: GREEN, bg: '#dcfce7', icon: 'check-circle-outline'};
-      case 'absent':  return {color: RED,   bg: '#fee2e2', icon: 'close-circle-outline'};
+      case 'present': return { color: GREEN, bg: '#dcfce7', icon: 'check-circle-outline' };
+      case 'absent': return { color: RED, bg: '#fee2e2', icon: 'close-circle-outline' };
       case 'sunday':
-      case 'holiday': return {color: BLUE,  bg: '#dbeafe', icon: 'calendar-star'};
-      case 'late':    return {color: ORANGE, bg: '#ffedd5', icon: 'clock-alert-outline'};
-      default:        return {color: TEXT_LIGHT, bg: GREY_2, icon: 'help-circle-outline'};
+      case 'holiday': return { color: BLUE, bg: '#dbeafe', icon: 'calendar-star' };
+      case 'late': return { color: ORANGE, bg: '#ffedd5', icon: 'clock-alert-outline' };
+      default: return { color: TEXT_LIGHT, bg: GREY_2, icon: 'help-circle-outline' };
     }
   };
+
+  const onNoticeScroll = useCallback((event) => {
+    const slideSize = event.nativeEvent.layoutMeasurement.width;
+    const index = event.nativeEvent.contentOffset.x / slideSize;
+    setActiveNoticeIndex(Math.round(index));
+  }, []);
 
   if (loading) {
     return (
@@ -188,156 +222,261 @@ const StudentDashboard = () => {
   const firstName = user?.name?.split(' ')[0] ?? 'Student';
   const atStyle = getAttendanceStyle(attendanceToday?.status);
 
-  return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.scroll}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          colors={[PRIMARY]}
-          tintColor={PRIMARY}
-        />
-      }>
-      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+  const renderNoticeBanner = ({ item }) => {
+    const isClassroom = item.classRoomId != null;
+    return (
+      <View style={styles.noticeSlideWrapper}>
+        <View style={styles.noticeCard}>
+          <View style={styles.noticeTopRow}>
+            <View style={[styles.noticeBadge, { backgroundColor: isClassroom ? PRIMARY_LIGHT : '#ffedd5' }]}>
+              <MatIcon name={isClassroom ? "google-classroom" : "office-building"} size={12} color={isClassroom ? PRIMARY : ORANGE} />
+              <Text style={[styles.noticeBadgeText, { color: isClassroom ? PRIMARY : ORANGE }]}>
+                {isClassroom ? 'Classroom Notice' : 'Branch Notice'}
+              </Text>
+            </View>
+            <Text style={styles.noticeTimeText}>{item.createdAt}</Text>
+          </View>
+          <Text style={styles.noticeHeading} numberOfLines={1}>{item.noticeName}</Text>
+          <Text style={styles.noticeBody} numberOfLines={2}>{item.noticeDescription}</Text>
+        </View>
+      </View>
+    );
+  };
 
-      {/* Welcome Card */}
-      <View style={styles.welcomeCard}>
-        <View style={styles.welcomeLeft}>
-          <Text style={styles.greeting}>{getGreeting()} 👋</Text>
-          <Text style={styles.welcomeName}>{firstName}</Text>
-          <View style={styles.welcomeMeta}>
-            {user?.classRoomId && (
-              <View style={styles.metaPill}>
-                <MatIcon name="google-classroom" size={11} color={PRIMARY} />
-                <Text style={styles.metaPillText}>Room {user.classRoomId}</Text>
-              </View>
-            )}
-            {user?.branchCode && (
-              <View style={styles.metaPill}>
-                <MatIcon name="office-building-outline" size={11} color={PRIMARY} />
-                <Text style={styles.metaPillText}>{user.branchCode}</Text>
+  return (
+    <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" backgroundColor={WHITE} />
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[PRIMARY]}
+            tintColor={PRIMARY}
+          />
+        }>
+
+        {/* Welcome Card */}
+        <View style={styles.welcomeCard}>
+          <View style={styles.welcomeLeft}>
+            <Text style={styles.greeting}>{getGreeting()} 👋</Text>
+            <Text style={styles.welcomeName}>{firstName}</Text>
+            <View style={styles.welcomeMeta}>
+              {user?.classRoomId && (
+                <View style={styles.metaPill}>
+                  <MatIcon name="google-classroom" size={11} color={PRIMARY} />
+                  <Text style={styles.metaPillText}>Room {user.classRoomId}</Text>
+                </View>
+              )}
+              {user?.branchCode && (
+                <View style={styles.metaPill}>
+                  <MatIcon name="office-building-outline" size={11} color={PRIMARY} />
+                  <Text style={styles.metaPillText}>{user.branchCode}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+          <View style={styles.welcomeAvatar}>
+            <Text style={styles.welcomeAvatarText}>
+              {user?.name
+                ?.split(' ')
+                ?.slice(0, 2)
+                ?.map(n => n[0])
+                ?.join('')
+                ?.toUpperCase() ?? '?'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Swipeable Dual-Source Notification Feed */}
+        {notifications.length > 0 && (
+          <View style={styles.notificationSectionContainer}>
+            <SectionHeader
+              title="Recent Announcements"
+              icon="bell-ring-outline"
+              onPress={() => setModalVisible(true)}
+            />
+            <FlatList
+              data={notifications}
+              renderItem={renderNoticeBanner}
+              keyExtractor={item => item.id.toString()}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={onNoticeScroll}
+              scrollEventThrottle={16}
+              snapToAlignment="center"
+              decelerationRate="fast"
+            />
+            {notifications.length > 1 && (
+              <View style={styles.dotsRow}>
+                {notifications.map((_, index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.dot,
+                      activeNoticeIndex === index ? styles.activeDot : styles.inactiveDot
+                    ]}
+                  />
+                ))}
               </View>
             )}
           </View>
-        </View>
-        <View style={styles.welcomeAvatar}>
-          <Text style={styles.welcomeAvatarText}>
-            {user?.name
-              ?.split(' ')
-              .slice(0, 2)
-              .map(n => n[0])
-              .join('')
-              .toUpperCase() ?? '?'}
-          </Text>
-        </View>
-      </View>
+        )}
 
-      {/* Today's Attendance */}
-      <SectionHeader
-        title="Today's Attendance"
-        icon="calendar-today"
-        onPress={() => navigation.navigate('Attendance')}
-      />
-      <TouchableOpacity
-        style={[styles.attendanceCard, {backgroundColor: atStyle.bg}]}
-        activeOpacity={0.85}
-        onPress={() => navigation.navigate('Attendance')}>
-        <MatIcon name={atStyle.icon} size={32} color={atStyle.color} />
-        <View style={styles.attendanceInfo}>
-          <Text style={[styles.attendanceStatus, {color: atStyle.color}]}>
-            {attendanceToday?.status ?? 'No Record'}
-          </Text>
-          <Text style={styles.attendanceDate}>
-            {attendanceToday?.date ?? new Date().toISOString().split('T')[0]}
-          </Text>
-          {attendanceToday?.loginTime && (
-            <Text style={styles.attendanceTime}>
-              {attendanceToday.loginTime} → {attendanceToday.logoutTime ?? '--'}
+        {/* Today's Attendance */}
+        <SectionHeader
+          title="Today's Attendance"
+          icon="calendar-today"
+          onPress={() => navigation.navigate('Attendance')}
+        />
+        <TouchableOpacity
+          style={[styles.attendanceCard, { backgroundColor: atStyle.bg }]}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('Attendance')}>
+          <MatIcon name={atStyle.icon} size={32} color={atStyle.color} />
+          <View style={styles.attendanceInfo}>
+            <Text style={[styles.attendanceStatus, { color: atStyle.color }]}>
+              {attendanceToday?.status ?? 'No Record'}
             </Text>
-          )}
-        </View>
-        <MatIcon name="chevron-right" size={20} color={atStyle.color} />
-      </TouchableOpacity>
-
-      {/* Fees */}
-      <SectionHeader
-        title="Fees"
-        icon="cash-multiple"
-        onPress={() => navigation.navigate('StudentFees')}
-      />
-      <View style={styles.feesCard}>
-        <View style={styles.feesItem}>
-          <Text style={styles.feesLabel}>Total</Text>
-          <Text style={styles.feesVal}>{fmt(feesData?.totalFees)}</Text>
-        </View>
-        <View style={styles.feesDivider} />
-        <View style={styles.feesItem}>
-          <Text style={styles.feesLabel}>Paid</Text>
-          <Text style={[styles.feesVal, {color: GREEN}]}>{fmt(feesData?.totalPaid)}</Text>
-        </View>
-        <View style={styles.feesDivider} />
-        <View style={styles.feesItem}>
-          <Text style={styles.feesLabel}>Pending</Text>
-          <Text
-            style={[
-              styles.feesVal,
-              {color: (feesData?.totalPending ?? 0) > 0 ? RED : GREEN},
-            ]}>
-            {fmt(feesData?.totalPending)}
-          </Text>
-        </View>
-      </View>
-
-      {/* Quick Stats */}
-      <Text style={styles.quickStatsLabel}>Quick Overview</Text>
-      <View style={styles.statsGrid}>
-        <StatCard
-          icon="chart-bar"
-          label="Avg Result"
-          value={resultsData ? `${resultsData.avg}%` : '—'}
-          color={PRIMARY}
-          bg={PRIMARY_LIGHT}
-          onPress={() => navigation.navigate('StudentResult')}
-        />
-        <StatCard
-          icon="clipboard-check-outline"
-          label="Exams"
-          value={resultsData?.total ?? '—'}
-          color={BLUE}
-          bg="#dbeafe"
-          onPress={() => navigation.navigate('StudentResult')}
-        />
-        <StatCard
-          icon="clipboard-text-outline"
-          label="Assignments"
-          value={assignmentsData?.total ?? '—'}
-          color={GREEN}
-          bg="#dcfce7"
-          onPress={() => navigation.navigate('Assignments')}
-        />
-        <StatCard
-          icon="clock-alert-outline"
-          label="Overdue"
-          value={assignmentsData?.overdue ?? '—'}
-          color={RED}
-          bg="#fee2e2"
-          onPress={() => navigation.navigate('Assignments')}
-        />
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footer}>
-        <TouchableOpacity onPress={() => Linking.openURL('https://pjsofttech.com')}>
-          <Text style={styles.footerText}>Software Designed By PJSOFTTECH Pvt. Ltd.</Text>
+            <Text style={styles.attendanceDate}>
+              {attendanceToday?.date ?? new Date().toISOString().split('T')[0]}
+            </Text>
+            {attendanceToday?.loginTime && (
+              <Text style={styles.attendanceTime}>
+                {attendanceToday.loginTime} → {attendanceToday.logoutTime ?? '--'}
+              </Text>
+            )}
+          </View>
+          <MatIcon name="chevron-right" size={20} color={atStyle.color} />
         </TouchableOpacity>
-        <Text style={styles.footerCopyright}>© All Rights Reserved</Text>
-      </View>
 
-      <View style={styles.bottomPad} />
-    </ScrollView>
+        {/* Fees */}
+        <SectionHeader
+          title="Fees"
+          icon="cash-multiple"
+          onPress={() => navigation.navigate('StudentFees')}
+        />
+        <View style={styles.feesCard}>
+          <View style={styles.feesItem}>
+            <Text style={styles.feesLabel}>Total</Text>
+            <Text style={styles.feesVal}>{fmt(feesData?.totalFees)}</Text>
+          </View>
+          <View style={styles.feesDivider} />
+          <View style={styles.feesItem}>
+            <Text style={styles.feesLabel}>Paid</Text>
+            <Text style={[styles.feesVal, { color: GREEN }]}>{fmt(feesData?.totalPaid)}</Text>
+          </View>
+          <View style={styles.feesDivider} />
+          <View style={styles.feesItem}>
+            <Text style={styles.feesLabel}>Pending</Text>
+            <Text
+              style={[
+                styles.feesVal,
+                { color: (feesData?.totalPending ?? 0) > 0 ? RED : GREEN },
+              ]}>
+              {fmt(feesData?.totalPending)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Quick Stats */}
+        <Text style={styles.quickStatsLabel}>Quick Overview</Text>
+        <View style={styles.statsGrid}>
+          <StatCard
+            icon="chart-bar"
+            label="Avg Result"
+            value={resultsData ? `${resultsData.avg}%` : '—'}
+            color={PRIMARY}
+            bg={PRIMARY_LIGHT}
+            onPress={() => navigation.navigate('StudentResult')}
+          />
+          <StatCard
+            icon="clipboard-check-outline"
+            label="Exams"
+            value={resultsData?.total ?? '—'}
+            color={BLUE}
+            bg="#dbeafe"
+            onPress={() => navigation.navigate('StudentResult')}
+          />
+          <StatCard
+            icon="clipboard-text-outline"
+            label="Assignments"
+            value={assignmentsData?.total ?? '—'}
+            color={GREEN}
+            bg="#dcfce7"
+            onPress={() => navigation.navigate('Assignments')}
+          />
+          <StatCard
+            icon="clock-alert-outline"
+            label="Overdue"
+            value={assignmentsData?.overdue ?? '—'}
+            color={RED}
+            bg="#fee2e2"
+            onPress={() => navigation.navigate('Assignments')}
+          />
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://pjsofttech.com')}>
+            <Text style={styles.footerText}>Software Designed By PJSOFTTECH Pvt. Ltd.</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerCopyright}>© All Rights Reserved</Text>
+        </View>
+
+        <View style={styles.bottomPad} />
+      </ScrollView>
+
+      {/* Full Notice Board Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlayContainer}>
+          <View style={styles.modalInnerWindow}>
+            <View style={styles.modalHeaderRow}>
+              <View style={styles.modalHeaderTitleGroup}>
+                <MatIcon name="bell-ring" size={20} color={PRIMARY} />
+                <Text style={styles.modalTitleText}>Notice Board</Text>
+              </View>
+              <TouchableOpacity style={styles.modalCloseIconBtn} onPress={() => setModalVisible(false)}>
+                <MatIcon name="close" size={22} color={TEXT_DARK} />
+              </TouchableOpacity>
+            </View>
+
+            <FlatList
+              data={notifications}
+              keyExtractor={item => 'modal_' + item.id.toString()}
+              contentContainerStyle={styles.modalListPadding}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => {
+                const isClassroom = item.classRoomId != null;
+                return (
+                  <View style={styles.modalListItemCard}>
+                    <View style={styles.noticeTopRow}>
+                      <View style={[styles.noticeBadge, { backgroundColor: isClassroom ? PRIMARY_LIGHT : '#ffedd5' }]}>
+                        <MatIcon name={isClassroom ? "google-classroom" : "office-building"} size={11} color={isClassroom ? PRIMARY : ORANGE} />
+                        <Text style={[styles.noticeBadgeText, { color: isClassroom ? PRIMARY : ORANGE }]}>
+                          {isClassroom ? 'Classroom' : 'Branch'}
+                        </Text>
+                      </View>
+                      <Text style={styles.noticeTimeText}>{item.createdAt}</Text>
+                    </View>
+                    <Text style={styles.modalItemTitle}>{item.noticeName}</Text>
+                    <Text style={styles.modalItemDescription}>{item.noticeDescription}</Text>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 };
 
@@ -345,50 +484,71 @@ const StudentDashboard = () => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: GREY_1 },
   scroll: { padding: 14, paddingTop: 16 },
-  // Loading
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
-  loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
-  // Welcome card
-  welcomeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: WHITE, borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.1, shadowRadius: 6, },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1 },
+  loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13 },
+  welcomeCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: WHITE, borderRadius: 16, padding: 16, marginBottom: 16, elevation: 2, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6 },
   welcomeLeft: { flex: 1 },
-  greeting: { fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
-  welcomeName: { fontSize: 20, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 1, },
-  welcomeMeta: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap', },
-  metaPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY_LIGHT, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, gap: 4, },
-  metaPillText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: PRIMARY, },
-  welcomeAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center', marginLeft: 12, },
-  welcomeAvatarText: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: WHITE, },
-  // Section header
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 4, },
-  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, },
-  sectionTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
-  viewAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, },
-  viewAllText: { fontSize: 12, fontFamily: 'Poppins-Regular', color: PRIMARY, },
-  // Attendance card
-  attendanceCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 16, gap: 12, },
+  greeting: { fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT },
+  welcomeName: { fontSize: 20, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 1 },
+  welcomeMeta: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' },
+  metaPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY_LIGHT, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, gap: 4 },
+  metaPillText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: PRIMARY },
+  welcomeAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  welcomeAvatarText: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: WHITE },
+  
+  // Custom Notifications Layout
+  notificationSectionContainer: { marginBottom: 16 },
+  noticeSlideWrapper: { width: SCREEN_WIDTH - 28, paddingHorizontal: 2 },
+  noticeCard: { backgroundColor: WHITE, borderRadius: 14, padding: 14, elevation: 2, borderWidth: 1, borderColor: GREY_2 },
+  noticeTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  noticeBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, gap: 4 },
+  noticeBadgeText: { fontSize: 9, fontFamily: 'Poppins-SemiBold' },
+  noticeTimeText: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT },
+  noticeHeading: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK },
+  noticeBody: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 2, lineHeight: 16 },
+  dotsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 8, gap: 5 },
+  dot: { height: 5, borderRadius: 3 },
+  activeDot: { width: 14, backgroundColor: PRIMARY },
+  inactiveDot: { width: 5, backgroundColor: GREY_2 },
+
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 4 },
+  sectionHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK },
+  viewAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewAllText: { fontSize: 12, fontFamily: 'Poppins-Regular', color: PRIMARY },
+  attendanceCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 16, gap: 12 },
   attendanceInfo: { flex: 1 },
-  attendanceStatus: { fontSize: 16, fontFamily: 'Poppins-SemiBold', lineHeight: 22, },
-  attendanceDate: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 1, },
-  attendanceTime: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, },
-  // Fees card
-  feesCard: { flexDirection: 'row', backgroundColor: WHITE, borderRadius: 14, paddingVertical: 14, marginBottom: 16, elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 4, },
+  attendanceStatus: { fontSize: 16, fontFamily: 'Poppins-SemiBold', lineHeight: 22 },
+  attendanceDate: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 1 },
+  attendanceTime: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID },
+  feesCard: { flexDirection: 'row', backgroundColor: WHITE, borderRadius: 14, paddingVertical: 14, marginBottom: 16, elevation: 2, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 },
   feesItem: { flex: 1, alignItems: 'center' },
-  feesLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginBottom: 3, },
-  feesVal: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
-  feesDivider: { width: 1, backgroundColor: GREY_2, marginVertical: 4, },
-  // Quick stats
-  quickStatsLabel: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 8, marginTop: 4, },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, },
-  statCard: { width: '47%', borderRadius: 14, padding: 14, alignItems: 'flex-start', elevation: 1, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.06, shadowRadius: 3, },
-  statIconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8, },
-  statVal: { fontSize: 20, fontFamily: 'Poppins-SemiBold', lineHeight: 26,  },
-  statLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 2, },
-  // Footer
-  footer: { alignItems: 'center', marginTop: 20, },
-  footerText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: PRIMARY, textDecorationLine: 'underline', },
-  footerCopyright: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginTop: 3, },
-  // BottomPad
-  bottomPad: { height: 20 },
+  feesLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginBottom: 3 },
+  feesVal: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK },
+  feesDivider: { width: 1, backgroundColor: GREY_2, marginVertical: 4 },
+  quickStatsLabel: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 8, marginTop: 4 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  statCard: { width: '47%', borderRadius: 14, padding: 14, alignItems: 'flex-start', elevation: 1, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3 },
+  statIconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  statVal: { fontSize: 20, fontFamily: 'Poppins-SemiBold', lineHeight: 26 },
+  statLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 2 },
+  
+  // Modal Style Matrix
+  modalOverlayContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalInnerWindow: { backgroundColor: WHITE, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%', minHeight: '50%' },
+  modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: GREY_2 },
+  modalHeaderTitleGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  modalTitleText: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK },
+  modalCloseIconBtn: { padding: 4 },
+  modalListPadding: { padding: 16, gap: 12 },
+  modalListItemCard: { backgroundColor: GREY_1, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: GREY_2 },
+  modalItemTitle: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 4 },
+  modalItemDescription: { fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginTop: 2, lineHeight: 18 },
+
+  footer: { alignItems: 'center', marginTop: 20 },
+  footerText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: PRIMARY, textDecorationLine: 'underline' },
+  footerCopyright: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginTop: 3 },
+  bottomPad: { height: 20 }
 });
 
 export default StudentDashboard;
