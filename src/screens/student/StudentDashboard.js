@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Linking, FlatList, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Linking, FlatList, Modal, Dimensions, Image } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import { useNavigation } from '@react-navigation/native';
 import useAuthStore from '@store/authStore';
@@ -82,6 +82,8 @@ const StudentDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Data states
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [studentName, setStudentName] = useState(user?.name ?? 'Student');
   const [attendanceToday, setAttendanceToday] = useState(null);
   const [feesData, setFeesData] = useState(null);
   const [resultsData, setResultsData] = useState(null);
@@ -102,6 +104,17 @@ const StudentDashboard = () => {
         user?.email
       );
 
+      if (student) {
+        // Track display name securely
+        if (student.fullName) {
+          setStudentName(student.fullName);
+        }
+
+        const docs = student?.documents ?? {};
+        const extractedPhoto = docs.studentPhoto || student?.oldRegisterPhoto || null;
+        setPhotoUrl(extractedPhoto);
+      }
+
       const classId = student?.classsRoomId;
 
       const [attendance, fees, results, assignments, branchNotices, classNotices] = await Promise.allSettled([
@@ -121,13 +134,13 @@ const StudentDashboard = () => {
           : Promise.resolve([]),
       ]);
 
-      // Attendance
+      // Attendance Processing
       if (attendance.status === 'fulfilled') {
         const content = attendance.value?.content ?? [];
         setAttendanceToday(content[0] ?? null);
       }
 
-      // Fees
+      // Fees Processing
       if (fees.status === 'fulfilled') {
         const data = Array.isArray(fees.value) ? fees.value : [];
         const totalFees = data.reduce((s, f) => s + (f.totalamount ?? 0), 0);
@@ -136,7 +149,7 @@ const StudentDashboard = () => {
         setFeesData({ totalFees, totalPaid, totalPending });
       }
 
-      // Results
+      // Results Processing
       if (results.status === 'fulfilled') {
         const data = Array.isArray(results.value) ? results.value : [];
         const avg =
@@ -146,7 +159,7 @@ const StudentDashboard = () => {
         setResultsData({ total: data.length, avg: avg.toFixed(1) });
       }
 
-      // Assignments
+      // Assignments Processing
       if (assignments.status === 'fulfilled') {
         const data = Array.isArray(assignments.value) ? assignments.value : [];
         const overdue = data.filter(a => getDaysInfo(a.dueDate) === 'overdue').length;
@@ -154,7 +167,7 @@ const StudentDashboard = () => {
         setAssignmentsData({ total: data.length, overdue, dueToday });
       }
 
-      // Combine & sort both notification
+      // Sync notifications feeds
       let combinedNotices = [];
       if (branchNotices.status === 'fulfilled' && Array.isArray(branchNotices.value)) {
         combinedNotices = [...combinedNotices, ...branchNotices.value];
@@ -219,8 +232,18 @@ const StudentDashboard = () => {
     );
   }
 
-  const firstName = user?.name?.split(' ')[0] ?? 'Student';
+  const firstName = studentName?.split(' ')[0] ?? 'Student';
   const atStyle = getAttendanceStyle(attendanceToday?.status);
+  
+  // Calculate Initials fallback identical to profile logic
+  const initials = studentName
+    ? studentName
+        .split(' ')
+        .slice(0, 2)
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+    : '?';
 
   const renderNoticeBanner = ({ item }) => {
     const isClassroom = item.classRoomId != null;
@@ -278,15 +301,19 @@ const StudentDashboard = () => {
               )}
             </View>
           </View>
+          
           <View style={styles.welcomeAvatar}>
-            <Text style={styles.welcomeAvatarText}>
-              {user?.name
-                ?.split(' ')
-                ?.slice(0, 2)
-                ?.map(n => n[0])
-                ?.join('')
-                ?.toUpperCase() ?? '?'}
-            </Text>
+            {photoUrl ? (
+              <Image
+                source={{ uri: photoUrl }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.welcomeAvatarText}>{initials}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -493,8 +520,11 @@ const styles = StyleSheet.create({
   welcomeMeta: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' },
   metaPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY_LIGHT, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, gap: 4 },
   metaPillText: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: PRIMARY },
-  welcomeAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  welcomeAvatarText: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: WHITE },
+  
+  welcomeAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: PRIMARY, overflow: 'hidden', marginLeft: 12 },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarFallback: { width: '100%', height: '100%', backgroundColor: PRIMARY_DARK, alignItems: 'center', justifyContent: 'center' },
+  welcomeAvatarText: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: WHITE },
   
   // Custom Notifications Layout
   notificationSectionContainer: { marginBottom: 16 },
