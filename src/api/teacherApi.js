@@ -282,5 +282,38 @@ export const teacherApi = {
       return []; // Return empty array to keep Dashboard stable
     }
   },
+  
+  // Get notifications for a classroom
+  getNotificationsByClassRoom: async (email, classId) => {
+    try {
+      const response = await api.get('/getNotificationByClassRoom', {
+        params: {
+          role: 'teacher',
+          email: email,
+          classId: classId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[TeacherApi] getNotificationsByClassRoom failed:', error.message);
+      throw error;
+    }
+  },
 
+  // Create a new notification for a specific classroom
+  createNotification: async (email, payload) => {
+    try {
+      const response = await api.post('/createNotification', payload, {
+        params: {
+          role: 'teacher',
+          email: email,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('[TeacherApi] createNotification failed:', error.message);
+      throw error;
+    }
+  },
+  
 };
