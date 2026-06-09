@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Dimensions, RefreshControl, StatusBar } from 'react-native';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Dimensions, RefreshControl, StatusBar, Alert, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -46,6 +46,7 @@ export const TeacherAttendance = () => {
   const [activeStatus, setActiveStatus] = useState('All');
   const [activeFilters, setActiveFilters] = useState({});
   const [filterResetKey, setFilterResetKey] = useState(0);
+  const [selectedRollNos, setSelectedRollNos] = useState([]);
 
   const fetchClassrooms = useCallback(async (isARefreshCall = false) => {
     if (isARefreshCall) {
@@ -119,6 +120,81 @@ export const TeacherAttendance = () => {
     setShowStatusDropdown(false);
   };
 
+  const toggleStudentSelection = (rollNo) => {
+  setSelectedRollNos(prev =>
+    prev.includes(rollNo)
+      ? prev.filter(r => r !== rollNo)
+      : [...prev, rollNo]
+  );
+};
+
+const handleSelectAll = () => {
+  const allRollNos = filteredData.map(item => item.rollNo);
+
+  if (
+    selectedRollNos.length === allRollNos.length &&
+    allRollNos.length > 0
+  ) {
+    setSelectedRollNos([]);
+  } else {
+    setSelectedRollNos(allRollNos);
+  }
+};
+
+const refreshAttendanceData = async () => {
+  try {
+    const res = await teacherApi.getAttendanceByClass(
+      selectedClassId,
+      activeTimeFrame,
+    );
+
+    const data = res.content || [];
+
+    setAttendanceData(data);
+
+    const filtered =
+      activeStatus === 'All'
+        ? data
+        : data.filter(i => i.status === activeStatus);
+
+    setFilteredData(filtered);
+  } catch (err) {
+    console.error('[Attendance Refresh]', err);
+  }
+};
+
+const handleMarkAttendance = async () => {
+  if (selectedRollNos.length === 0) {
+    Alert.alert(
+      'Validation',
+      'Please select at least one student.'
+    );
+    return;
+  }
+
+  try {
+  const response = await teacherApi.markStudentAttendance(
+    selectedClassId,
+    selectedRollNos,
+  );
+
+  Alert.alert(
+    'Attendance',
+    response?.message || 'Attendance marked successfully.'
+  );
+
+  setSelectedRollNos([]);
+
+  await refreshAttendanceData();
+
+} catch (error) {
+  Alert.alert(
+    'Attendance',
+    error.message || 'Failed to mark attendance.'
+  );
+}
+};
+
   const stats = useMemo(() => {
     const total = attendanceData.length;
     const onTime = attendanceData.filter((i) => i.status === 'On Time').length;
@@ -127,40 +203,110 @@ export const TeacherAttendance = () => {
   }, [attendanceData]);
 
   const renderStudentItem = useCallback(({ item }) => {
-    const isOnTime = item.status === 'On Time';
-    return (
-      <View style={styles.studentCard}>
-        <View style={styles.cardMain}>
-          <Text style={styles.rollNoText}>{item.rollNo}</Text>
-          <View style={styles.flexTextContainer}>
-            <Text style={styles.studentNameText}>{item.studentName}</Text>
-            <Text style={styles.dateLabel}>{item.date}</Text>
+  const isOnTime = item.status === 'On Time';
+  const isSelected = selectedRollNos.includes(item.rollNo);
+
+  return (
+    <View style={styles.studentCard}>
+      <View style={styles.cardMain}>
+
+        <Pressable
+          onPress={() => toggleStudentSelection(item.rollNo)}
+          style={styles.checkboxContainer}
+        >
+          <MatIcon
+            name={
+              isSelected
+                ? 'checkbox-marked'
+                : 'checkbox-blank-outline'
+            }
+            size={24}
+            color={PRIMARY}
+          />
+        </Pressable>
+
+        <Text style={styles.rollNoText}>
+          {item.rollNo}
+        </Text>
+
+        <View style={styles.flexTextContainer}>
+          <Text style={styles.studentNameText}>
+            {item.studentName}
+          </Text>
+          <Text style={styles.dateLabel}>
+            {item.date}
+          </Text>
+        </View>
+
+        <View
+          style={[
+            styles.statusBadge,
+            {
+              backgroundColor: isOnTime
+                ? '#e8f5e9'
+                : '#ffebee',
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusText,
+              {
+                color: isOnTime
+                  ? SUCCESS
+                  : DANGER,
+              },
+            ]}
+          >
+            {item.status}
+          </Text>
+        </View>
+      </View>
+
+      {isOnTime && (
+        <View style={styles.presentDetailsRow}>
+          <View style={styles.detailBox}>
+            <MatIcon
+              name="login"
+              size={14}
+              color="#666"
+            />
+            <Text style={styles.detailValue}>
+              In: {item.loginTime || '--:--'}
+            </Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: isOnTime ? '#e8f5e9' : '#ffebee' }]}>
-            <Text style={[styles.statusText, { color: isOnTime ? SUCCESS : DANGER }]}>{item.status}</Text>
+
+          <View style={styles.detailBox}>
+            <MatIcon
+              name="logout"
+              size={14}
+              color="#666"
+            />
+            <Text style={styles.detailValue}>
+              Out: {item.logoutTime || '--:--'}
+            </Text>
+          </View>
+
+          <View style={styles.detailBox}>
+            <MatIcon
+              name="clock-outline"
+              size={14}
+              color={PRIMARY}
+            />
+            <Text
+              style={[
+                styles.detailValue,
+                styles.workingMinsText,
+              ]}
+            >
+              {item.workingMinutes}m
+            </Text>
           </View>
         </View>
-        {isOnTime && (
-          <View style={styles.presentDetailsRow}>
-            <View style={styles.detailBox}>
-              <MatIcon name="login" size={14} color="#666" />
-              <Text style={styles.detailValue}>In: {item.loginTime || '--:--'}</Text>
-            </View>
-            <View style={styles.detailBox}>
-              <MatIcon name="logout" size={14} color="#666" />
-              <Text style={styles.detailValue}>Out: {item.logoutTime || '--:--'}</Text>
-            </View>
-            <View style={styles.detailBox}>
-              <MatIcon name="clock-outline" size={14} color={PRIMARY} />
-              <Text style={[styles.detailValue, styles.workingMinsText]}>
-                {item.workingMinutes}m
-              </Text>
-            </View>
-          </View>
-        )}
-      </View>
-    );
-  }, []);
+      )}
+    </View>
+  );
+}, [selectedRollNos]);
 
   const renderClassroomItem = useCallback(({ item }) => (
     <View style={styles.card}>
@@ -345,6 +491,37 @@ export const TeacherAttendance = () => {
               </View>
             </View>
 
+            <View style={styles.attendanceActionRow}>
+              <Pressable
+              style={styles.selectAllContainer}
+              onPress={handleSelectAll}
+              >
+                <MatIcon
+                name={
+                  filteredData.length > 0 &&
+                  selectedRollNos.length === filteredData.length
+                  ? 'checkbox-marked'
+                  : 'checkbox-blank-outline'
+                }
+                size={24}
+                color={PRIMARY}
+              />
+              
+              <Text style={styles.selectAllText}>
+                Select All
+                </Text>
+                </Pressable>
+                
+                <Pressable
+                style={styles.markAttendanceBtn}
+                onPress={handleMarkAttendance}
+                >
+                  <Text style={styles.markAttendanceText}>
+                    Mark Attendance
+                  </Text>
+                </Pressable>
+              </View>
+
             {modalLoading ? (
               <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
             ) : (
@@ -416,6 +593,14 @@ const styles = StyleSheet.create({
   statBox: { flex: 1, alignItems: 'center' },
   statNum: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#1a1a2e' },
   statSub: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#777', marginTop: 2 },
+
+  // attendanceActionRow
+  attendanceActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, },
+  selectAllContainer: { flexDirection: 'row', alignItems: 'center', },
+  selectAllText: { marginLeft: 8, color: '#333', fontFamily: 'Poppins-Medium', },
+  markAttendanceBtn: { backgroundColor: PRIMARY, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, },
+  markAttendanceText: { color: '#fff', fontFamily: 'Poppins-SemiBold', fontSize: 13, },
+  checkboxContainer: { marginRight: 8, },
   
   // Student Card Items
   studentCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f0f0f0' },

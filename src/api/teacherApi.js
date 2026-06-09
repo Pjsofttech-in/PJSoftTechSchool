@@ -316,4 +316,20 @@ export const teacherApi = {
     }
   },
   
+  // Submit daily student attendance checklist with native array of rollno (e.g., [1,2,5,12])
+  markStudentAttendance: async (classroomId, rollNos) => {
+    try {
+      const response = await api.post('/markStudentAttendanceByTeacher', null, {
+        params: {
+          rollNos: rollNos.join(','),
+          classroomId: classroomId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to submit attendance.';
+      console.error(`[TeacherApi] markStudentAttendance failed: ${message}`);
+      throw new Error(message);
+    }
+  },
 };
