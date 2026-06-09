@@ -191,19 +191,21 @@ export const TeacherAttendance = () => {
     </View>
   ), []);
 
-  const renderEmptyState = useCallback(() => (
-    <View style={styles.emptyBox}>
-      <MatIcon name="calendar-remove-outline" size={60} color="#ccc" />
-      <Text style={styles.emptyText}>No classrooms match the selected filters.</Text>
-      <Pressable 
-        android_ripple={RIPPLE_CONFIG} 
-        style={styles.clearFiltersButton} 
-        onPress={handleClearFilters}
-      >
-        <Text style={styles.clearFiltersText}>Reset Filters</Text>
-      </Pressable>
-    </View>
-  ), [allClassrooms]);
+  const renderEmptyState = () => (
+  <View style={styles.emptyBox}>
+    <MatIcon name="calendar-remove-outline" size={60} color="#ccc" />
+    <Text style={styles.emptyText}>
+      No classrooms match the selected filters.
+    </Text>
+    <Pressable
+      android_ripple={RIPPLE_CONFIG}
+      style={styles.clearFiltersButton}
+      onPress={handleClearFilters}
+    >
+      <Text style={styles.clearFiltersText}>Reset Filters</Text>
+    </Pressable>
+  </View>
+);
 
   return (
     <SafeAreaView style={styles.container}>
