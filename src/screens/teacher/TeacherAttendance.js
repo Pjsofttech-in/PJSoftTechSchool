@@ -22,6 +22,67 @@ const TIMEFRAME_LABELS = {
   '365days': 'Year',
 };
 
+const STATUS_OPTIONS = [
+  { id: 'All', label: 'All' },
+  { id: 'On Time', label: 'On Time' },
+  { id: 'Absent', label: 'Absent' }
+];
+
+const StudentRow = React.memo(({ item, isSelected, onToggle }) => {
+  const isOnTime = item.status === 'On Time';
+  
+  return (
+    <View style={styles.studentCard}>
+      <View style={styles.cardMain}>
+        <Pressable
+          onPress={() => onToggle(item.rollNo)}
+          style={styles.checkboxContainer}
+        >
+          <MatIcon
+            name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
+            size={24}
+            color={PRIMARY}
+          />
+        </Pressable>
+
+        <Text style={styles.rollNoText}>{item.rollNo}</Text>
+
+        <View style={styles.flexTextContainer}>
+          <Text style={styles.studentNameText}>{item.studentName}</Text>
+          <Text style={styles.dateLabel}>{item.date}</Text>
+        </View>
+
+        <View style={[styles.statusBadge, { backgroundColor: isOnTime ? '#e8f5e9' : '#ffebee' }]}>
+          <Text style={[styles.statusText, { color: isOnTime ? SUCCESS : DANGER }]}>
+            {item.status}
+          </Text>
+        </View>
+      </View>
+
+      {isOnTime && (
+        <View style={styles.presentDetailsRow}>
+          <View style={styles.detailBox}>
+            <MatIcon name="login" size={14} color="#666" />
+            <Text style={styles.detailValue}>In: {item.loginTime || '--:--'}</Text>
+          </View>
+
+          <View style={styles.detailBox}>
+            <MatIcon name="logout" size={14} color="#666" />
+            <Text style={styles.detailValue}>Out: {item.logoutTime || '--:--'}</Text>
+          </View>
+
+          <View style={styles.detailBox}>
+            <MatIcon name="clock-outline" size={14} color={PRIMARY} />
+            <Text style={[styles.detailValue, styles.workingMinsText]}>
+              {item.workingMinutes}m
+            </Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+});
+
 export const TeacherAttendance = () => {
   const user = useAuthStore((state) => state.user);
 
@@ -46,7 +107,9 @@ export const TeacherAttendance = () => {
   const [activeStatus, setActiveStatus] = useState('All');
   const [activeFilters, setActiveFilters] = useState({});
   const [filterResetKey, setFilterResetKey] = useState(0);
-  const [selectedRollNos, setSelectedRollNos] = useState([]);
+  
+  // High-performance selection lookup
+  const [selectedRollNos, setSelectedRollNos] = useState(new Set());
 
   const fetchClassrooms = useCallback(async (isARefreshCall = false) => {
     if (isARefreshCall) {
@@ -90,6 +153,7 @@ export const TeacherAttendance = () => {
   };
 
   const handleViewAttendance = async (classId, className, timeFrame = 'today') => {
+    setSelectedRollNos(new Set());
     setIsModalVisible(true);
     setModalLoading(true);
     setSelectedClassId(classId);
@@ -120,80 +184,71 @@ export const TeacherAttendance = () => {
     setShowStatusDropdown(false);
   };
 
-  const toggleStudentSelection = (rollNo) => {
-  setSelectedRollNos(prev =>
-    prev.includes(rollNo)
-      ? prev.filter(r => r !== rollNo)
-      : [...prev, rollNo]
-  );
-};
+  const toggleStudentSelection = useCallback((rollNo) => {
+    setSelectedRollNos(prev => {
+      const next = new Set(prev);
+      if (next.has(rollNo)) {
+        next.delete(rollNo);
+      } else {
+        next.add(rollNo);
+      }
+      return next;
+    });
+  }, []);
 
-const handleSelectAll = () => {
-  const allRollNos = filteredData.map(item => item.rollNo);
+  const handleSelectAll = () => {
+    const allRollNos = filteredData.map(item => item.rollNo);
+    if (selectedRollNos.size === allRollNos.length && allRollNos.length > 0) {
+      setSelectedRollNos(new Set());
+    } else {
+      setSelectedRollNos(new Set(allRollNos));
+    }
+  };
 
-  if (
-    selectedRollNos.length === allRollNos.length &&
-    allRollNos.length > 0
-  ) {
-    setSelectedRollNos([]);
-  } else {
-    setSelectedRollNos(allRollNos);
-  }
-};
+  const refreshAttendanceData = async () => {
+    try {
+      const res = await teacherApi.getAttendanceByClass(
+        selectedClassId,
+        activeTimeFrame
+      );
 
-const refreshAttendanceData = async () => {
-  try {
-    const res = await teacherApi.getAttendanceByClass(
-      selectedClassId,
-      activeTimeFrame,
-    );
+      console.log(
+        'Attendance Refresh:',
+        JSON.stringify(res.content, null, 2)
+      );
 
-    const data = res.content || [];
+      const data = res.content || [];
+      setAttendanceData(data);
 
-    setAttendanceData(data);
-
-    const filtered =
-      activeStatus === 'All'
-        ? data
+      const filtered = activeStatus === 'All' 
+        ? data 
         : data.filter(i => i.status === activeStatus);
 
-    setFilteredData(filtered);
-  } catch (err) {
-    console.error('[Attendance Refresh]', err);
-  }
-};
+      setFilteredData(filtered);
+    } catch (err) {
+      console.error('[Attendance Refresh]', err);
+    }
+  };
 
-const handleMarkAttendance = async () => {
-  if (selectedRollNos.length === 0) {
-    Alert.alert(
-      'Validation',
-      'Please select at least one student.'
-    );
-    return;
-  }
+  const handleMarkAttendance = async () => {
+    if (selectedRollNos.size === 0) {
+      Alert.alert('Validation', 'Please select at least one student.');
+      return;
+    }
 
-  try {
-  const response = await teacherApi.markStudentAttendance(
-    selectedClassId,
-    selectedRollNos,
-  );
+    try {
+      const response = await teacherApi.markStudentAttendance(
+        selectedClassId,
+        Array.from(selectedRollNos),
+      );
 
-  Alert.alert(
-    'Attendance',
-    response?.message || 'Attendance marked successfully.'
-  );
-
-  setSelectedRollNos([]);
-
-  await refreshAttendanceData();
-
-} catch (error) {
-  Alert.alert(
-    'Attendance',
-    error.message || 'Failed to mark attendance.'
-  );
-}
-};
+      Alert.alert('Attendance', response?.message || 'Attendance marked successfully.');
+      setSelectedRollNos(new Set());
+      await refreshAttendanceData();
+    } catch (error) {
+      Alert.alert('Attendance', error.message || 'Failed to mark attendance.');
+    }
+  };
 
   const stats = useMemo(() => {
     const total = attendanceData.length;
@@ -202,111 +257,13 @@ const handleMarkAttendance = async () => {
     return { total, onTime, absent };
   }, [attendanceData]);
 
-  const renderStudentItem = useCallback(({ item }) => {
-  const isOnTime = item.status === 'On Time';
-  const isSelected = selectedRollNos.includes(item.rollNo);
-
-  return (
-    <View style={styles.studentCard}>
-      <View style={styles.cardMain}>
-
-        <Pressable
-          onPress={() => toggleStudentSelection(item.rollNo)}
-          style={styles.checkboxContainer}
-        >
-          <MatIcon
-            name={
-              isSelected
-                ? 'checkbox-marked'
-                : 'checkbox-blank-outline'
-            }
-            size={24}
-            color={PRIMARY}
-          />
-        </Pressable>
-
-        <Text style={styles.rollNoText}>
-          {item.rollNo}
-        </Text>
-
-        <View style={styles.flexTextContainer}>
-          <Text style={styles.studentNameText}>
-            {item.studentName}
-          </Text>
-          <Text style={styles.dateLabel}>
-            {item.date}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.statusBadge,
-            {
-              backgroundColor: isOnTime
-                ? '#e8f5e9'
-                : '#ffebee',
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statusText,
-              {
-                color: isOnTime
-                  ? SUCCESS
-                  : DANGER,
-              },
-            ]}
-          >
-            {item.status}
-          </Text>
-        </View>
-      </View>
-
-      {isOnTime && (
-        <View style={styles.presentDetailsRow}>
-          <View style={styles.detailBox}>
-            <MatIcon
-              name="login"
-              size={14}
-              color="#666"
-            />
-            <Text style={styles.detailValue}>
-              In: {item.loginTime || '--:--'}
-            </Text>
-          </View>
-
-          <View style={styles.detailBox}>
-            <MatIcon
-              name="logout"
-              size={14}
-              color="#666"
-            />
-            <Text style={styles.detailValue}>
-              Out: {item.logoutTime || '--:--'}
-            </Text>
-          </View>
-
-          <View style={styles.detailBox}>
-            <MatIcon
-              name="clock-outline"
-              size={14}
-              color={PRIMARY}
-            />
-            <Text
-              style={[
-                styles.detailValue,
-                styles.workingMinsText,
-              ]}
-            >
-              {item.workingMinutes}m
-            </Text>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}, [selectedRollNos]);
+  const renderStudentItem = useCallback(({ item }) => (
+    <StudentRow 
+      item={item}
+      isSelected={selectedRollNos.has(item.rollNo)}
+      onToggle={toggleStudentSelection}
+    />
+  ), [selectedRollNos, toggleStudentSelection]);
 
   const renderClassroomItem = useCallback(({ item }) => (
     <View style={styles.card}>
@@ -338,20 +295,18 @@ const handleMarkAttendance = async () => {
   ), []);
 
   const renderEmptyState = () => (
-  <View style={styles.emptyBox}>
-    <MatIcon name="calendar-remove-outline" size={60} color="#ccc" />
-    <Text style={styles.emptyText}>
-      No classrooms match the selected filters.
-    </Text>
-    <Pressable
-      android_ripple={RIPPLE_CONFIG}
-      style={styles.clearFiltersButton}
-      onPress={handleClearFilters}
-    >
-      <Text style={styles.clearFiltersText}>Reset Filters</Text>
-    </Pressable>
-  </View>
-);
+    <View style={styles.emptyBox}>
+      <MatIcon name="calendar-remove-outline" size={60} color="#ccc" />
+      <Text style={styles.emptyText}>No classrooms match the selected filters.</Text>
+      <Pressable
+        android_ripple={RIPPLE_CONFIG}
+        style={styles.clearFiltersButton}
+        onPress={handleClearFilters}
+      >
+        <Text style={styles.clearFiltersText}>Reset Filters</Text>
+      </Pressable>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -404,25 +359,6 @@ const handleMarkAttendance = async () => {
                       <Text style={styles.chipValue}>{TIMEFRAME_LABELS[activeTimeFrame]}</Text>
                       <MatIcon name="menu-down" size={16} color={PRIMARY} />
                     </Pressable>
-                    {showTimeDropdown && (
-                      <View style={styles.dropdownMenu}>
-                        {Object.keys(TIMEFRAME_LABELS).map((key) => (
-                          <Pressable 
-                            key={key} 
-                            android_ripple={RIPPLE_CONFIG}
-                            style={styles.menuItem} 
-                            onPress={() => handleViewAttendance(selectedClassId, selectedClassName, key)}
-                          >
-                            <Text style={[
-                              styles.menuItemText, 
-                              activeTimeFrame === key && styles.selectedMenuText
-                            ]}>
-                              {TIMEFRAME_LABELS[key]}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
                   </View>
 
                   {/* Status Filter */}
@@ -439,25 +375,6 @@ const handleMarkAttendance = async () => {
                       <Text style={styles.chipValue}>{activeStatus}</Text>
                       <MatIcon name="menu-down" size={16} color={PRIMARY} />
                     </Pressable>
-                    {showStatusDropdown && (
-                      <View style={[styles.dropdownMenu, styles.statusMenuOffset]}>
-                        {['All', 'On Time', 'Absent'].map((status) => (
-                          <Pressable 
-                            key={status} 
-                            android_ripple={RIPPLE_CONFIG}
-                            style={styles.menuItem} 
-                            onPress={() => filterByStatus(status)}
-                          >
-                            <Text style={[
-                              styles.menuItemText, 
-                              activeStatus === status && styles.selectedMenuText
-                            ]}>
-                              {status}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    )}
                   </View>
                 </View>
               </View>
@@ -474,6 +391,40 @@ const handleMarkAttendance = async () => {
                 <MatIcon name="close-circle" size={32} color="#bbb" />
               </Pressable>
             </View>
+
+            {showTimeDropdown && (
+              <View style={[styles.dropdownMenu, { left: 20, top: 110 }]}>
+                {Object.keys(TIMEFRAME_LABELS).map((key) => (
+                  <Pressable 
+                    key={key} 
+                    android_ripple={RIPPLE_CONFIG}
+                    style={styles.menuItem} 
+                    onPress={() => handleViewAttendance(selectedClassId, selectedClassName, key)}
+                  >
+                    <Text style={[styles.menuItemText, activeTimeFrame === key && styles.selectedMenuText]}>
+                      {TIMEFRAME_LABELS[key]}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
+            {showStatusDropdown && (
+              <View style={[styles.dropdownMenu, { left: 145, top: 110 }]}>
+                {STATUS_OPTIONS.map((opt) => (
+                  <Pressable 
+                    key={opt.id} 
+                    android_ripple={RIPPLE_CONFIG}
+                    style={styles.menuItem} 
+                    onPress={() => filterByStatus(opt.id)}
+                  >
+                    <Text style={[styles.menuItemText, activeStatus === opt.id && styles.selectedMenuText]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
 
             {/* Dashboard Aggregates */}
             <View style={styles.statsBar}>
@@ -492,35 +443,19 @@ const handleMarkAttendance = async () => {
             </View>
 
             <View style={styles.attendanceActionRow}>
-              <Pressable
-              style={styles.selectAllContainer}
-              onPress={handleSelectAll}
-              >
+              <Pressable style={styles.selectAllContainer} onPress={handleSelectAll}>
                 <MatIcon
-                name={
-                  filteredData.length > 0 &&
-                  selectedRollNos.length === filteredData.length
-                  ? 'checkbox-marked'
-                  : 'checkbox-blank-outline'
-                }
-                size={24}
-                color={PRIMARY}
-              />
-              
-              <Text style={styles.selectAllText}>
-                Select All
-                </Text>
-                </Pressable>
+                  name={filteredData.length > 0 && selectedRollNos.size === filteredData.length ? 'checkbox-marked' : 'checkbox-blank-outline'}
+                  size={24}
+                  color={PRIMARY}
+                />
+                <Text style={styles.selectAllText}>Select All</Text>
+              </Pressable>
                 
-                <Pressable
-                style={styles.markAttendanceBtn}
-                onPress={handleMarkAttendance}
-                >
-                  <Text style={styles.markAttendanceText}>
-                    Mark Attendance
-                  </Text>
-                </Pressable>
-              </View>
+              <Pressable style={styles.markAttendanceBtn} onPress={handleMarkAttendance}>
+                <Text style={styles.markAttendanceText}>Mark Attendance</Text>
+              </Pressable>
+            </View>
 
             {modalLoading ? (
               <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
@@ -528,7 +463,7 @@ const handleMarkAttendance = async () => {
               <FlatList 
                 data={filteredData} 
                 renderItem={renderStudentItem} 
-                keyExtractor={(item, index) => index.toString()} 
+                keyExtractor={(item) => `${item.rollNo}-${item.date}`} 
                 contentContainerStyle={styles.modalListPadding} 
                 ListEmptyComponent={
                   <View style={styles.emptyBox}>
@@ -559,50 +494,38 @@ const styles = StyleSheet.create({
   subTitle: { fontSize: 12, color: '#666', fontFamily: 'Poppins-Regular' },
   yearBadge: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   yearText: { fontSize: 10, color: '#777', fontWeight: 'bold' },
-  
   actionButton: { backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 8, gap: 8, overflow: 'hidden' },
   buttonText: { fontFamily: 'Poppins-SemiBold', color: '#fff', fontSize: 14 },
-  
-  // Empty UI States
   emptyBox: { alignItems: 'center', justifyContent: 'center', marginTop: 60, paddingHorizontal: 30 },
   emptyText: { fontFamily: 'Poppins-Regular', color: '#666', textAlign: 'center', marginTop: 10, fontSize: 14 },
   clearFiltersButton: { marginTop: 15, backgroundColor: '#ede9ff', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, overflow: 'hidden' },
   clearFiltersText: { fontFamily: 'Poppins-SemiBold', color: PRIMARY, fontSize: 13 },
-  
-  // Modal Base Layers
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, height: SCREEN_HEIGHT * 0.85, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 },
   headerFlex: { flex: 1 },
   modalTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: '#1a1a2e' },
   filtersRow: { flexDirection: 'row', marginTop: 12 },
-  dropdownWrapper: { zIndex: 2000 },
+  dropdownWrapper: { marginRight: 10 },
   dropdownChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f0ff', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#7b68ee33', overflow: 'hidden' },
-  marginLeftChip: { marginLeft: 10 },
+  marginLeftChip: { marginLeft: 0 },
   chipLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#555' },
   chipValue: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: PRIMARY, marginRight: 2 },
-  dropdownMenu: { position: 'absolute', top: 42, left: 0, backgroundColor: '#fff', borderRadius: 12, width: 140, elevation: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10, paddingVertical: 5, zIndex: 3000 },
-  statusMenuOffset: { left: 10 },
+  dropdownMenu: { position: 'absolute', backgroundColor: '#fff', borderRadius: 12, width: 140, elevation: 12, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, paddingVertical: 5, zIndex: 9999 },
   menuItem: { paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0', overflow: 'hidden' },
   menuItemText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#333' },
   selectedMenuText: { color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
   closeBtnPadding: { padding: 4, borderRadius: 20 },
-  
-  // Statistics Panel
-  statsBar: { flexDirection: 'row', backgroundColor: '#f8f9fe', borderRadius: 15, padding: 15, marginBottom: 15 },
+  statsBar: { flexDirection: 'row', backgroundColor: '#f8f9fe', borderRadius: 15, padding: 15, marginBottom: 15, marginTop: 15 },
   statBox: { flex: 1, alignItems: 'center' },
   statNum: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#1a1a2e' },
   statSub: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#777', marginTop: 2 },
-
-  // attendanceActionRow
-  attendanceActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, },
-  selectAllContainer: { flexDirection: 'row', alignItems: 'center', },
-  selectAllText: { marginLeft: 8, color: '#333', fontFamily: 'Poppins-Medium', },
-  markAttendanceBtn: { backgroundColor: PRIMARY, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, },
-  markAttendanceText: { color: '#fff', fontFamily: 'Poppins-SemiBold', fontSize: 13, },
-  checkboxContainer: { marginRight: 8, },
-  
-  // Student Card Items
+  attendanceActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  selectAllContainer: { flexDirection: 'row', alignItems: 'center' },
+  selectAllText: { marginLeft: 8, color: '#333', fontFamily: 'Poppins-Medium' },
+  markAttendanceBtn: { backgroundColor: PRIMARY, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  markAttendanceText: { color: '#fff', fontFamily: 'Poppins-SemiBold', fontSize: 13 },
+  checkboxContainer: { marginRight: 8 },
   studentCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f0f0f0' },
   cardMain: { flexDirection: 'row', alignItems: 'center' },
   rollNoText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#777', width: 35 },
