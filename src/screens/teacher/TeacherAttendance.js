@@ -10,40 +10,39 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#7b68ee';
 const SUCCESS = '#4caf50';
 const DANGER = '#f44336';
+const SURFACE_BG = '#f8f9fe';
 
-const RIPPLE_CONFIG = { color: 'rgba(123, 104, 238, 0.15)', borderless: false };
-const CIRCLE_RIPPLE = { borderless: true, radius: 20 };
+const RIPPLE_CONFIG = { color: 'rgba(123, 104, 238, 0.1)', borderless: false };
 const SPINNER_COLORS = [PRIMARY];
 
-const TIMEFRAME_LABELS = {
-  today: 'Today',
-  '7days': '7 Days',
-  '30days': '30 Days',
-  '365days': 'Year',
-};
+const TIMEFRAME_OPTIONS = [
+  { id: 'today', label: 'Today' },
+  { id: '7days', label: '7 Days' },
+  { id: '30days', label: '30 Days' },
+  { id: '365days', label: 'Year' },
+];
 
 const STATUS_OPTIONS = [
   { id: 'All', label: 'All' },
   { id: 'On Time', label: 'On Time' },
-  { id: 'Absent', label: 'Absent' }
+  { id: 'Absent', label: 'Absent' },
 ];
 
 const StudentRow = React.memo(({ item, isSelected, onToggle }) => {
   const isOnTime = item.status === 'On Time';
-  
+
   return (
-    <View style={styles.studentCard}>
+    <Pressable
+      onPress={() => onToggle(item.rollNo)}
+      android_ripple={RIPPLE_CONFIG}
+      style={[styles.studentCard, isSelected && styles.studentCardSelected]}
+    >
       <View style={styles.cardMain}>
-        <Pressable
-          onPress={() => onToggle(item.rollNo)}
-          style={styles.checkboxContainer}
-        >
-          <MatIcon
-            name={isSelected ? 'checkbox-marked' : 'checkbox-blank-outline'}
-            size={24}
-            color={PRIMARY}
-          />
-        </Pressable>
+        <MatIcon
+          name={isSelected ? 'checkbox-marked-circle' : 'minus-circle-outline'}
+          size={22}
+          color={isSelected ? PRIMARY : '#bbb'}
+        />
 
         <Text style={styles.rollNoText}>{item.rollNo}</Text>
 
@@ -62,24 +61,24 @@ const StudentRow = React.memo(({ item, isSelected, onToggle }) => {
       {isOnTime && (
         <View style={styles.presentDetailsRow}>
           <View style={styles.detailBox}>
-            <MatIcon name="login" size={14} color="#666" />
+            <MatIcon name="login" size={12} color="#777" />
             <Text style={styles.detailValue}>In: {item.loginTime || '--:--'}</Text>
           </View>
 
           <View style={styles.detailBox}>
-            <MatIcon name="logout" size={14} color="#666" />
+            <MatIcon name="logout" size={12} color="#777" />
             <Text style={styles.detailValue}>Out: {item.logoutTime || '--:--'}</Text>
           </View>
 
           <View style={styles.detailBox}>
-            <MatIcon name="clock-outline" size={14} color={PRIMARY} />
+            <MatIcon name="clock-outline" size={12} color={PRIMARY} />
             <Text style={[styles.detailValue, styles.workingMinsText]}>
               {item.workingMinutes}m
             </Text>
           </View>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 });
 
@@ -91,15 +90,13 @@ export const TeacherAttendance = () => {
   const [classrooms, setClassrooms] = useState([]);
   const [attendanceData, setAttendanceData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-  
-  // UI & Loading States
+
+  // UI States
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [showTimeDropdown, setShowTimeDropdown] = useState(false);
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
-  
+
   // Selection Contexts
   const [selectedClassId, setSelectedClassId] = useState(null);
   const [selectedClassName, setSelectedClassName] = useState('');
@@ -107,9 +104,8 @@ export const TeacherAttendance = () => {
   const [activeStatus, setActiveStatus] = useState('All');
   const [activeFilters, setActiveFilters] = useState({});
   const [filterResetKey, setFilterResetKey] = useState(0);
-  
-  // High-performance selection lookup
-  const [selectedRollNos, setSelectedRollNos] = useState(new Set());
+
+  const [selectedRollNos, setSelectedRollNos] = useState([]);
 
   const fetchClassrooms = useCallback(async (isARefreshCall = false) => {
     if (isARefreshCall) {
@@ -149,104 +145,95 @@ export const TeacherAttendance = () => {
   const handleClearFilters = () => {
     setActiveFilters({});
     setClassrooms(allClassrooms);
-    setFilterResetKey(prev => prev + 1);
+    setFilterResetKey((prev) => prev + 1);
   };
 
-  const handleViewAttendance = async (classId, className, timeFrame = 'today') => {
-    setSelectedRollNos(new Set());
-    setIsModalVisible(true);
+  // Internal structural query runner (prevents flickering modal components)
+  const queryAttendanceData = async (classId, timeFrame, targetStatus) => {
     setModalLoading(true);
-    setSelectedClassId(classId);
-    setSelectedClassName(className);
-    setActiveTimeFrame(timeFrame);
-    setActiveStatus('All');
-    setShowTimeDropdown(false);
-
     try {
       const res = await teacherApi.getAttendanceByClass(classId, timeFrame);
       const data = res.content || [];
       setAttendanceData(data);
-      setFilteredData(data);
+
+      const filtered = targetStatus === 'All'
+        ? data
+        : data.filter((i) => i.status === targetStatus);
+      setFilteredData(filtered);
     } catch (err) {
-      console.error('[AttendanceDetails] Fetch Error:', err);
+      console.error('[AttendanceDetails] Fetch Query Error:', err);
     } finally {
       setModalLoading(false);
     }
   };
 
-  const filterByStatus = (status) => {
-    const filtered = status === 'All' 
-      ? attendanceData 
-      : attendanceData.filter((i) => i.status === status);
-    
+  const handleViewAttendance = (classId, className) => {
+    setSelectedRollNos([]);
+    setSelectedClassId(classId);
+    setSelectedClassName(className);
+    setActiveTimeFrame('today');
+    setActiveStatus('All');
+    setIsModalVisible(true);
+    queryAttendanceData(classId, 'today', 'All');
+  };
+
+  const handleTimeframeChange = (timeFrame) => {
+    setActiveTimeFrame(timeFrame);
+    setSelectedRollNos([]);
+    queryAttendanceData(selectedClassId, timeFrame, activeStatus);
+  };
+
+  const handleStatusChange = (status) => {
     setActiveStatus(status);
+    const filtered = status === 'All'
+      ? attendanceData
+      : attendanceData.filter((i) => i.status === status);
     setFilteredData(filtered);
-    setShowStatusDropdown(false);
   };
 
   const toggleStudentSelection = useCallback((rollNo) => {
-    setSelectedRollNos(prev => {
-      const next = new Set(prev);
-      if (next.has(rollNo)) {
-        next.delete(rollNo);
-      } else {
-        next.add(rollNo);
-      }
-      return next;
-    });
+    setSelectedRollNos((prev) =>
+      prev.includes(rollNo) ? prev.filter((id) => id !== rollNo) : [...prev, rollNo]
+    );
   }, []);
 
   const handleSelectAll = () => {
-    const allRollNos = filteredData.map(item => item.rollNo);
-    if (selectedRollNos.size === allRollNos.length && allRollNos.length > 0) {
-      setSelectedRollNos(new Set());
+    const allRollNos = filteredData.map((item) => item.rollNo);
+    if (selectedRollNos.length === allRollNos.length && allRollNos.length > 0) {
+      setSelectedRollNos([]);
     } else {
-      setSelectedRollNos(new Set(allRollNos));
+      setSelectedRollNos(allRollNos);
     }
   };
 
   const refreshAttendanceData = async () => {
     try {
-      const res = await teacherApi.getAttendanceByClass(
-        selectedClassId,
-        activeTimeFrame
-      );
-
-      console.log(
-        'Attendance Refresh:',
-        JSON.stringify(res.content, null, 2)
-      );
-
+      const res = await teacherApi.getAttendanceByClass(selectedClassId, activeTimeFrame);
       const data = res.content || [];
       setAttendanceData(data);
 
-      const filtered = activeStatus === 'All' 
-        ? data 
-        : data.filter(i => i.status === activeStatus);
-
+      const filtered = activeStatus === 'All'
+        ? data
+        : data.filter((i) => i.status === activeStatus);
       setFilteredData(filtered);
     } catch (err) {
-      console.error('[Attendance Refresh]', err);
+      console.error('[Attendance Refresh Error]', err);
     }
   };
 
   const handleMarkAttendance = async () => {
-    if (selectedRollNos.size === 0) {
-      Alert.alert('Validation', 'Please select at least one student.');
-      return;
-    }
+    if (selectedRollNos.length === 0) return;
 
     try {
       const response = await teacherApi.markStudentAttendance(
         selectedClassId,
-        Array.from(selectedRollNos),
+        selectedRollNos
       );
-
-      Alert.alert('Attendance', response?.message || 'Attendance marked successfully.');
-      setSelectedRollNos(new Set());
+      Alert.alert('Attendance', response?.message || 'Attendance status altered successfully.');
+      setSelectedRollNos([]);
       await refreshAttendanceData();
     } catch (error) {
-      Alert.alert('Attendance', error.message || 'Failed to mark attendance.');
+      Alert.alert('Attendance Exception', error.message || 'Failed to sync modifications.');
     }
   };
 
@@ -258,9 +245,9 @@ export const TeacherAttendance = () => {
   }, [attendanceData]);
 
   const renderStudentItem = useCallback(({ item }) => (
-    <StudentRow 
+    <StudentRow
       item={item}
-      isSelected={selectedRollNos.has(item.rollNo)}
+      isSelected={selectedRollNos.includes(item.rollNo)}
       onToggle={toggleStudentSelection}
     />
   ), [selectedRollNos, toggleStudentSelection]);
@@ -283,30 +270,28 @@ export const TeacherAttendance = () => {
         </View>
       </View>
 
-      <Pressable 
+      <Pressable
         android_ripple={RIPPLE_CONFIG}
-        style={styles.actionButton} 
+        style={styles.actionButton}
         onPress={() => handleViewAttendance(item.id, `${item.standard} - ${item.division}`)}
       >
         <Text style={styles.buttonText}>View Attendance</Text>
-        <MatIcon name="chevron-right" size={20} color="#fff" />
+        <MatIcon name="arrow-right" size={18} color="#fff" />
       </Pressable>
     </View>
   ), []);
 
   const renderEmptyState = () => (
     <View style={styles.emptyBox}>
-      <MatIcon name="calendar-remove-outline" size={60} color="#ccc" />
+      <MatIcon name="calendar-remove-outline" size={54} color="#ccc" />
       <Text style={styles.emptyText}>No classrooms match the selected filters.</Text>
-      <Pressable
-        android_ripple={RIPPLE_CONFIG}
-        style={styles.clearFiltersButton}
-        onPress={handleClearFilters}
-      >
+      <Pressable style={styles.clearFiltersButton} onPress={handleClearFilters}>
         <Text style={styles.clearFiltersText}>Reset Filters</Text>
       </Pressable>
     </View>
   );
+
+  const isAllSelected = filteredData.length > 0 && selectedRollNos.length === filteredData.length;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -325,154 +310,149 @@ export const TeacherAttendance = () => {
           renderItem={renderClassroomItem}
           ListEmptyComponent={renderEmptyState}
           refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh} 
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
               colors={SPINNER_COLORS}
               tintColor={PRIMARY}
-              progressBackgroundColor="#fff"
             />
           }
         />
       )}
 
-      {/* Attendance Detail Modal Sheet */}
-      <Modal animationType="slide" transparent visible={isModalVisible} onRequestClose={() => setIsModalVisible(false)}>
+      {/* Bottom Sheet Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={isModalVisible}
+        onRequestClose={() => setIsModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            
+            <View style={styles.notchHandle} />
+
             <View style={styles.modalHeader}>
               <View style={styles.headerFlex}>
                 <Text style={styles.modalTitle}>{selectedClassName}</Text>
-                
-                <View style={styles.filtersRow}>
-                  {/* Timeframe Selector */}
-                  <View style={styles.dropdownWrapper}>
-                    <Pressable 
-                      android_ripple={RIPPLE_CONFIG}
-                      style={styles.dropdownChip} 
-                      onPress={() => {
-                        setShowTimeDropdown(!showTimeDropdown);
-                        setShowStatusDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.chipLabel}>Time: </Text>
-                      <Text style={styles.chipValue}>{TIMEFRAME_LABELS[activeTimeFrame]}</Text>
-                      <MatIcon name="menu-down" size={16} color={PRIMARY} />
-                    </Pressable>
-                  </View>
-
-                  {/* Status Filter */}
-                  <View style={styles.dropdownWrapper}>
-                    <Pressable 
-                      android_ripple={RIPPLE_CONFIG}
-                      style={[styles.dropdownChip, styles.marginLeftChip]} 
-                      onPress={() => {
-                        setShowStatusDropdown(!showStatusDropdown);
-                        setShowTimeDropdown(false);
-                      }}
-                    >
-                      <Text style={styles.chipLabel}>Status: </Text>
-                      <Text style={styles.chipValue}>{activeStatus}</Text>
-                      <MatIcon name="menu-down" size={16} color={PRIMARY} />
-                    </Pressable>
-                  </View>
-                </View>
+                <Text style={styles.modalSubTitle}>Class Management Matrix</Text>
               </View>
 
-              <Pressable 
-                android_ripple={CIRCLE_RIPPLE}
-                style={styles.closeBtnPadding}
-                onPress={() => {
-                  setIsModalVisible(false);
-                  setShowTimeDropdown(false);
-                  setShowStatusDropdown(false);
-                }}
-              >
-                <MatIcon name="close-circle" size={32} color="#bbb" />
+              <Pressable style={styles.closeButtonIcon} onPress={() => setIsModalVisible(false)}>
+                <MatIcon name="close" size={20} color="#222" />
               </Pressable>
             </View>
 
-            {showTimeDropdown && (
-              <View style={[styles.dropdownMenu, { left: 20, top: 110 }]}>
-                {Object.keys(TIMEFRAME_LABELS).map((key) => (
-                  <Pressable 
-                    key={key} 
-                    android_ripple={RIPPLE_CONFIG}
-                    style={styles.menuItem} 
-                    onPress={() => handleViewAttendance(selectedClassId, selectedClassName, key)}
-                  >
-                    <Text style={[styles.menuItemText, activeTimeFrame === key && styles.selectedMenuText]}>
-                      {TIMEFRAME_LABELS[key]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            {showStatusDropdown && (
-              <View style={[styles.dropdownMenu, { left: 145, top: 110 }]}>
-                {STATUS_OPTIONS.map((opt) => (
-                  <Pressable 
-                    key={opt.id} 
-                    android_ripple={RIPPLE_CONFIG}
-                    style={styles.menuItem} 
-                    onPress={() => filterByStatus(opt.id)}
-                  >
-                    <Text style={[styles.menuItemText, activeStatus === opt.id && styles.selectedMenuText]}>
-                      {opt.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            {/* Dashboard Aggregates */}
+            {/* Micro Dashboard Statistics Tracker */}
             <View style={styles.statsBar}>
               <View style={styles.statBox}>
                 <Text style={styles.statNum}>{stats.total}</Text>
-                <Text style={styles.statSub}>Total</Text>
+                <Text style={styles.statSub}>Total Enrolled</Text>
               </View>
+              <View style={styles.dividerLine} />
               <View style={styles.statBox}>
                 <Text style={[styles.statNum, { color: SUCCESS }]}>{stats.onTime}</Text>
-                <Text style={styles.statSub}>On Time</Text>
+                <Text style={styles.statSub}>Present</Text>
               </View>
+              <View style={styles.dividerLine} />
               <View style={styles.statBox}>
                 <Text style={[styles.statNum, { color: DANGER }]}>{stats.absent}</Text>
                 <Text style={styles.statSub}>Absent</Text>
               </View>
             </View>
 
-            <View style={styles.attendanceActionRow}>
+            {/* Timeframe Horizontal Scrollable Row */}
+            <View style={styles.pillScrollerContainer}>
+              <FlatList
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                data={TIMEFRAME_OPTIONS}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  const isActive = activeTimeFrame === item.id;
+                  return (
+                    <Pressable
+                      onPress={() => handleTimeframeChange(item.id)}
+                      style={[styles.pillChip, isActive && styles.pillChipActive]}
+                    >
+                      <Text style={[styles.pillText, isActive && styles.pillTextActive]}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+            </View>
+
+            {/* Status Segmented Segment Controls */}
+            <View style={styles.segmentedContainer}>
+              {STATUS_OPTIONS.map((opt) => {
+                const isActive = activeStatus === opt.id;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => handleStatusChange(opt.id)}
+                    style={[styles.segmentTab, isActive && styles.segmentTabActive]}
+                  >
+                    <Text style={[styles.segmentLabel, isActive && styles.segmentLabelActive]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Inline Selection Utility Controller */}
+            <View style={styles.utilityActionHeader}>
               <Pressable style={styles.selectAllContainer} onPress={handleSelectAll}>
                 <MatIcon
-                  name={filteredData.length > 0 && selectedRollNos.size === filteredData.length ? 'checkbox-marked' : 'checkbox-blank-outline'}
-                  size={24}
+                  name={isAllSelected ? 'checkbox-marked-circle' : 'minus-circle-outline'}
+                  size={20}
                   color={PRIMARY}
                 />
-                <Text style={styles.selectAllText}>Select All</Text>
-              </Pressable>
-                
-              <Pressable style={styles.markAttendanceBtn} onPress={handleMarkAttendance}>
-                <Text style={styles.markAttendanceText}>Mark Attendance</Text>
+                <Text style={styles.selectAllText}>
+                  {isAllSelected ? 'Deselect All Logs' : 'Select Group Spectrum'}
+                </Text>
               </Pressable>
             </View>
 
+            {/* Inner List Area */}
             {modalLoading ? (
-              <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
+              <View style={styles.modalLoaderContainer}>
+                <ActivityIndicator size="small" color={PRIMARY} />
+                <Text style={styles.loadingDataText}>Syncing records...</Text>
+              </View>
             ) : (
-              <FlatList 
-                data={filteredData} 
-                renderItem={renderStudentItem} 
-                keyExtractor={(item) => `${item.rollNo}-${item.date}`} 
-                contentContainerStyle={styles.modalListPadding} 
+              <FlatList
+                data={filteredData}
+                renderItem={renderStudentItem}
+                keyExtractor={(item) => `${item.rollNo}-${item.date}`}
+                contentContainerStyle={styles.modalListPadding}
                 ListEmptyComponent={
                   <View style={styles.emptyBox}>
-                    <MatIcon name="account-search-outline" size={48} color="#ccc" />
-                    <Text style={styles.emptyText}>No registration data logs found matching this group filter criteria.</Text>
+                    <MatIcon name="account-search-outline" size={40} color="#ccc" />
+                    <Text style={styles.emptyText}>No logs match current filters.</Text>
                   </View>
                 }
               />
             )}
+
+            {/* Sticky Floating Action Control Module */}
+            {selectedRollNos.length > 0 && (
+              <View style={styles.floatingActionContainer}>
+                <Pressable
+                  android_ripple={{ color: 'rgba(255,255,255,0.2)' }}
+                  style={styles.floatingActionButton}
+                  onPress={handleMarkAttendance}
+                >
+                  <Text style={styles.floatingActionText}>
+                    Mark {selectedRollNos.length} Selected Student{selectedRollNos.length > 1 ? 's' : ''}
+                  </Text>
+                  <MatIcon name="check-all" size={18} color="#fff" />
+                </Pressable>
+              </View>
+            )}
+
           </View>
         </View>
       </Modal>
@@ -484,61 +464,82 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f7ff' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 14 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 14, elevation: 1.5, overflow: 'hidden' },
+  card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#edf2f7' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  standardCircle: { width: 44, height: 44, borderRadius: 10, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
-  standardText: { color: PRIMARY, fontFamily: 'Poppins-Medium', fontSize: 15, fontWeight: 'bold' },
+  standardCircle: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#ede9ff', justifyContent: 'center', alignItems: 'center' },
+  standardText: { color: PRIMARY, fontSize: 15, fontWeight: 'bold' },
   headerText: { marginLeft: 12, flex: 1 },
-  mainTitle: { fontSize: 15, fontFamily: 'Poppins-Medium', color: '#1a1a2e', fontWeight: '600' },
+  mainTitle: { fontSize: 15, color: '#1a1a2e', fontWeight: '600' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  subTitle: { fontSize: 12, color: '#666', fontFamily: 'Poppins-Regular' },
+  subTitle: { fontSize: 12, color: '#666' },
   yearBadge: { backgroundColor: '#f0f0f0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   yearText: { fontSize: 10, color: '#777', fontWeight: 'bold' },
-  actionButton: { backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 8, gap: 8, overflow: 'hidden' },
-  buttonText: { fontFamily: 'Poppins-SemiBold', color: '#fff', fontSize: 14 },
-  emptyBox: { alignItems: 'center', justifyContent: 'center', marginTop: 60, paddingHorizontal: 30 },
-  emptyText: { fontFamily: 'Poppins-Regular', color: '#666', textAlign: 'center', marginTop: 10, fontSize: 14 },
-  clearFiltersButton: { marginTop: 15, backgroundColor: '#ede9ff', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, overflow: 'hidden' },
-  clearFiltersText: { fontFamily: 'Poppins-SemiBold', color: PRIMARY, fontSize: 13 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 30, borderTopRightRadius: 30, height: SCREEN_HEIGHT * 0.85, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 15 },
+  actionButton: { backgroundColor: PRIMARY, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: 10, gap: 6 },
+  buttonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  emptyBox: { alignItems: 'center', justifyContent: 'center', marginTop: 40, paddingHorizontal: 30 },
+  emptyText: { color: '#777', textAlign: 'center', marginTop: 10, fontSize: 13 },
+  clearFiltersButton: { marginTop: 15, backgroundColor: '#ede9ff', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20 },
+  clearFiltersText: { color: PRIMARY, fontSize: 13, fontWeight: '600' },
+  
+  // Bottom Sheet Modal Layout
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(10,10,20,0.4)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, height: SCREEN_HEIGHT * 0.88, paddingHorizontal: 20, paddingTop: 8, pb: 0 },
+  notchHandle: { width: 38, height: 4, backgroundColor: '#e2e8f0', borderRadius: 2, alignSelf: 'center', marginBottom: 14 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   headerFlex: { flex: 1 },
-  modalTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: '#1a1a2e' },
-  filtersRow: { flexDirection: 'row', marginTop: 12 },
-  dropdownWrapper: { marginRight: 10 },
-  dropdownChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f0ff', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#7b68ee33', overflow: 'hidden' },
-  marginLeftChip: { marginLeft: 0 },
-  chipLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: '#555' },
-  chipValue: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: PRIMARY, marginRight: 2 },
-  dropdownMenu: { position: 'absolute', backgroundColor: '#fff', borderRadius: 12, width: 140, elevation: 12, shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, paddingVertical: 5, zIndex: 9999 },
-  menuItem: { paddingHorizontal: 15, paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#f0f0f0', overflow: 'hidden' },
-  menuItemText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#333' },
-  selectedMenuText: { color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
-  closeBtnPadding: { padding: 4, borderRadius: 20 },
-  statsBar: { flexDirection: 'row', backgroundColor: '#f8f9fe', borderRadius: 15, padding: 15, marginBottom: 15, marginTop: 15 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
+  modalSubTitle: { fontSize: 12, color: '#777', marginTop: 1 },
+  closeButtonIcon: { backgroundColor: '#f1f3f9', p: 8, borderRadius: 20, width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  
+  // Bento Grid Info Stats Top Rail Layouts
+  statsBar: { flexDirection: 'row', backgroundColor: SURFACE_BG, borderRadius: 14, paddingVertical: 12, marginBottom: 14, alignItems: 'center' },
   statBox: { flex: 1, alignItems: 'center' },
-  statNum: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#1a1a2e' },
-  statSub: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#777', marginTop: 2 },
-  attendanceActionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
-  selectAllContainer: { flexDirection: 'row', alignItems: 'center' },
-  selectAllText: { marginLeft: 8, color: '#333', fontFamily: 'Poppins-Medium' },
-  markAttendanceBtn: { backgroundColor: PRIMARY, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  markAttendanceText: { color: '#fff', fontFamily: 'Poppins-SemiBold', fontSize: 13 },
-  checkboxContainer: { marginRight: 8 },
-  studentCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#f0f0f0' },
+  statNum: { fontSize: 16, fontWeight: '700', color: '#111' },
+  statSub: { fontSize: 11, color: '#718096', marginTop: 1 },
+  dividerLine: { width: 1, height: 24, backgroundColor: '#e2e8f0' },
+  
+  // Clean Pill Horizontal Scrollers 
+  pillScrollerContainer: { marginBottom: 12 },
+  pillChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: SURFACE_BG, marginRight: 8, borderWidth: 1, borderColor: '#edf2f7' },
+  pillChipActive: { backgroundColor: '#ede9ff', borderColor: '#7b68ee44' },
+  pillText: { fontSize: 12, color: '#4a5568', fontWeight: '500' },
+  pillTextActive: { color: PRIMARY, fontWeight: '700' },
+
+  // Segmented Bar Control Systems
+  segmentedContainer: { flexDirection: 'row', backgroundColor: SURFACE_BG, borderRadius: 10, padding: 3, marginBottom: 14 },
+  segmentTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  segmentTabActive: { backgroundColor: '#fff', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 2 },
+  segmentLabel: { fontSize: 12, color: '#718096', fontWeight: '500' },
+  segmentLabelActive: { color: PRIMARY, fontWeight: '700' },
+
+  // Inline List Utility Row Headers
+  utilityActionHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, marginBottom: 8 },
+  selectAllContainer: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  selectAllText: { fontSize: 12, color: '#4a5568', fontWeight: '600' },
+
+  // Student Borderless Compact List
+  studentCard: { paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: '#f7fafc', marginBottom: 2 },
+  studentCardSelected: { backgroundColor: '#fcfbfe' },
   cardMain: { flexDirection: 'row', alignItems: 'center' },
-  rollNoText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: '#777', width: 35 },
-  flexTextContainer: { flex: 1, marginLeft: 10 },
-  studentNameText: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#1a1a2e' },
-  dateLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#777' },
-  statusBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  statusText: { fontFamily: 'Poppins-SemiBold', fontSize: 12 },
-  presentDetailsRow: { flexDirection: 'row', marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f8f8f8', justifyContent: 'space-between' },
+  rollNoText: { fontSize: 13, fontWeight: '700', color: '#718096', width: 32, marginLeft: 10, textAlign: 'center' },
+  flexTextContainer: { flex: 1, marginLeft: 8 },
+  studentNameText: { fontSize: 14, fontWeight: '600', color: '#1a202c' },
+  dateLabel: { fontSize: 11, color: '#a0aec0', marginTop: 1 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  statusText: { fontSize: 11, fontWeight: '700' },
+  presentDetailsRow: { flexDirection: 'row', marginTop: 10, paddingLeft: 42, justifyContent: 'flex-start', gap: 20 },
   detailBox: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  detailValue: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#555' },
-  workingMinsText: { color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
-  modalListPadding: { paddingBottom: 40 }
+  detailValue: { fontSize: 11, color: '#718096' },
+  workingMinsText: { color: PRIMARY, fontWeight: '600' },
+  
+  modalLoaderContainer: { py: 40, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  loadingDataText: { fontSize: 12, color: '#718096' },
+  modalListPadding: { paddingBottom: 100 },
+
+  // Contextual Floating Action Buttons
+  floatingActionContainer: { position: 'absolute', bottom: 24, left: 20, right: 20, shadowColor: PRIMARY, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.22, shadowRadius: 8, elevation: 8 },
+  floatingActionButton: { backgroundColor: PRIMARY, borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  floatingActionText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
 
 export default TeacherAttendance;
