@@ -332,4 +332,26 @@ export const teacherApi = {
       throw new Error(message);
     }
   },
+
+  // Get historical analytics specific student across the academic calendar
+  getResultByStudentAndAcademicYear: async (email, studentId) => {
+    try {
+      const response = await api.get('/getResultByStudentAndAcademicYear', {
+        params: {
+          role: 'teacher',
+          email: email,
+          studentId: studentId,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to sync student history timeline.';
+      console.error(`[TeacherApi] getResultByStudentAndAcademicYear failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
 };
