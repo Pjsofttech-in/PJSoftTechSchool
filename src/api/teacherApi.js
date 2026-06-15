@@ -354,4 +354,21 @@ export const teacherApi = {
     }
   },
 
+  // submitMarkByTeacher
+  submitMarkByTeacher: async (email, payload) => {
+    try {
+      const response = await api.post('/submitMarkByTeacher', payload, {
+        params: {
+          role: 'teacher',
+          email: email,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Failed to submit Marks.';
+      console.error(`[TeacherApi] submitMarkByTeacher failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+  
 };

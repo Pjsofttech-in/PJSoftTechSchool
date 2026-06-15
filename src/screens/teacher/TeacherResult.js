@@ -261,27 +261,78 @@ const TeacherResultContent = () => {
   }, [user?.email, selectedClassId]);
 
   const openAssignMarks = useCallback((student) => {
-    setSelectedStudent(student);
-    const initialInput = {};
-    student.details?.forEach(d => {
-      initialInput[d.subjectId || d.subjectName] = d.obtainedMarks?.toString() || '';
-    });
-    setMarksInput(initialInput);
-    setIsAssignModalVisible(true);
-  }, []);
+  setSelectedStudent(student);
+
+  const initialInput = {};
+
+  student.details?.forEach(d => {
+    initialInput[d.subjectId] =
+      d.obtainedMarks?.toString() || '';
+  });
+
+  setMarksInput(initialInput);
+  setIsAssignModalVisible(true);
+}, []);
 
   const submitAssignedMarks = async () => {
+  try {
     setAssignLoading(true);
-    try {
-      ToastAndroid.show('Marks successfully synced to roster', ToastAndroid.SHORT);
-      setIsAssignModalVisible(false);
-      fetchResults(selectedExamId, selectedExamName);
-    } catch (err) {
-      ToastAndroid.show('Failed to save assessment marks', ToastAndroid.LONG);
-    } finally {
-      setAssignLoading(false);
+
+    for (const subject of selectedStudent.details) {
+
+      const subjectId = subject.subjectId;
+
+      const obtainedMarks = Number(
+        marksInput[subjectId] || 0
+      );
+
+      // Validation
+      if (obtainedMarks > subject.maxMarks) {
+        ToastAndroid.show(
+          `${subject.subjectName} marks cannot exceed ${subject.maxMarks}`,
+          ToastAndroid.LONG
+        );
+        return;
+      }
+
+      const payload = {
+        studentId: selectedStudent.studentId,
+        examId: selectedExamId,
+        subjectId: subjectId,
+        obtainedMarks: obtainedMarks,
+      };
+
+      console.log("Payload =>", payload);
+
+      await teacherApi.submitMarkByTeacher(
+        user.email,
+        payload
+      );
     }
-  };
+
+    ToastAndroid.show(
+      'Marks submitted successfully',
+      ToastAndroid.SHORT
+    );
+
+    setIsAssignModalVisible(false);
+
+    await fetchResults(
+      selectedExamId,
+      selectedExamName
+    );
+
+  } catch (err) {
+    console.log("Submit Error =>", err);
+
+    ToastAndroid.show(
+      err.message || 'Failed to submit marks',
+      ToastAndroid.LONG
+    );
+  } finally {
+    setAssignLoading(false);
+  }
+};
 
   const openStudentHistory = useCallback(async (student) => {
     if (!student?.studentId) {
@@ -479,7 +530,7 @@ const TeacherResultContent = () => {
             <Text style={styles.dialogSub}>{selectedStudent?.studentName}</Text>
 
             {selectedStudent?.details?.map((sub) => {
-              const id = sub.subjectId || sub.subjectName;
+              const id = sub.subjectId;
               return (
                 <View key={id} style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>{sub.subjectName} (Max: {sub.maxMarks})</Text>
@@ -488,7 +539,13 @@ const TeacherResultContent = () => {
                     keyboardType="numeric"
                     placeholder="Enter marks"
                     value={marksInput[id] || ''}
-                    onChangeText={(text) => setMarksInput(prev => ({ ...prev, [id]: text }))}
+                    onChangeText={(text) => {
+                      const numericValue = text.replace(/[^0-9]/g, '');
+                      setMarksInput(prev => ({
+                        ...prev,
+                        [id]: numericValue,
+                      }));
+                    }}
                   />
                 </View>
               );
