@@ -28,8 +28,8 @@ class TeacherAccountContent extends Component {
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>@</Text>
             </View>
-            <Text style={styles.userName}>Aakash Kathole</Text>
-            <Text style={styles.userRole}>Application Dev</Text>
+            <Text style={styles.userName}> Please log in again </Text>
+            <Text style={styles.userRole}> to access your account. </Text>
           </View>
 
           {/* SETTINGS MENU */}
@@ -61,7 +61,7 @@ class TeacherAccountContent extends Component {
                 onPress={() => {/* Handle Logout logic */}}
              >
                 <MatIcon name="power" size={20} color="#fff" />
-                <Text style={styles.logoutText}>Sign Out</Text>
+                <Text style={styles.logoutText}> PJSoftTech, Pune </Text>
              </TouchableOpacity>
           </View>
         </ScrollView>

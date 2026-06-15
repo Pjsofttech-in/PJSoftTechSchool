@@ -85,7 +85,7 @@ const TeacherProfile = () => {
                 <Text style={styles.roleBadge}>{teacherData?.institutionType || 'Faculty'}</Text>
               </View>
               <Text style={styles.teacherName} numberOfLines={2}>
-                {teacherData?.teacherName || 'Aakash Kathole'}
+                {teacherData?.teacherName || 'Please log in again to access account.'}
               </Text>
               <Text style={styles.teacherEmail} numberOfLines={1}>
                 {teacherData?.teacherEmail}
