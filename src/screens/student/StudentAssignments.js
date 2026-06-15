@@ -496,7 +496,7 @@ const StudentAssignments = () => {
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: GREY_1},
   // Summary strip
-  summaryCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
+  summaryCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
   summaryItem: { flex: 1, alignItems: 'center'},
   summaryVal: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 22, },
   summaryLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },

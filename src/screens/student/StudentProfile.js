@@ -495,7 +495,7 @@ const StudentProfile = () => {
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: GREY_1},
   // Header
-  header: { backgroundColor: PRIMARY, paddingTop: 14, paddingHorizontal: 16, paddingBottom: 0, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
+  header: { backgroundColor: PRIMARY, paddingTop: 14, paddingHorizontal: 16, paddingBottom: 0, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
   headerTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, },
   avatarWrap: {position: 'relative', marginRight: 12},
   avatar: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, borderColor: WHITE, },
