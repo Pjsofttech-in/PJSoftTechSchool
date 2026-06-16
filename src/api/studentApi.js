@@ -206,4 +206,59 @@ export const studentApi = {
     }
   },
   
+  // Get all submitted assignments by student
+  getSubmittedAssignments: async (studentId, role, email) => {
+    try {
+      const response = await api.get(
+        '/getAllSubmittedAssignmentByStudent',
+        {
+          params: {
+            studentId,
+            role,
+            email,
+          },
+        },
+      );
+      
+      return response.data;
+    } catch (error) {
+      const message =
+      error.response?.data?.message ||
+      error.message ||
+      'Failed to fetch submitted assignments.';
+      
+      throw new Error(message);
+    }
+  },
+  
+  // Update an existing assignment submission
+  updateSubmission: async (
+    role,
+    email,
+    submissionId,
+    submission,
+  ) => {
+    try {
+      const response = await api.put(
+        `/updateSubmission/${submissionId}`,
+        submission,
+        {
+          params: {
+            role,
+            email,
+          },
+        },
+      );
+      
+      return response.data;
+    } catch (error) {
+      const message =
+      error.response?.data?.message ||
+      error.message ||
+      'Failed to update submission.';
+      
+      throw new Error(message);
+    }
+  },
+  
 };

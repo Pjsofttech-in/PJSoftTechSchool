@@ -1,5 +1,5 @@
 import React, {useEffect, useState, useCallback} from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Image, Modal, TextInput, KeyboardAvoidingView, Platform, } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Image, Modal, TextInput, KeyboardAvoidingView, Platform, ToastAndroid, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
@@ -74,7 +74,6 @@ const SubmitModal = ({
       transparent
       animationType="slide"
       onRequestClose={handleClose}>
-      {/* Platform-conditional behavior for KeyboardAvoidingView */}
       <KeyboardAvoidingView
         style={styles.modalOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -159,7 +158,6 @@ const SubmitModal = ({
 };
 
 // Assignment Card
-// Added `submitted` prop to show submitted state on card
 const AssignmentCard = ({item, onImagePress, onSubmitPress}) => {
   const daysInfo = getDaysInfo(item.dueDate);
   const isSubmitted = !!item.submitted;
@@ -229,7 +227,6 @@ const AssignmentCard = ({item, onImagePress, onSubmitPress}) => {
             </View>
           )}
 
-          {/* "Submitted ✓" chip if already submitted, else show Submit */}
           {isSubmitted ? (
             <View style={styles.submittedChip}>
               <MatIcon name="check-circle-outline" size={12} color={GREEN} />
@@ -266,21 +263,16 @@ const StudentAssignments = () => {
   const [submitSuccess, setSubmitSuccess] = useState(null);
   const [submitError, setSubmitError] = useState(null);
 
+  // History modal states
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [submittedAssignments, setSubmittedAssignments] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const fetchAssignments = useCallback(async () => {
     try {
       setError(null);
-
-      const student = await studentApi.getStudentById(
-        user?.id,
-        user?.role,
-        user?.email
-      );
-      
-      const data = await studentApi.getAssignments(
-        student?.classsRoomId,
-        user?.role,
-        user?.email,
-      );
+      const student = await studentApi.getStudentById(user?.id, user?.role, user?.email);
+      const data = await studentApi.getAssignments(student?.classsRoomId, user?.role, user?.email);
       setAssignments(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error('[StudentAssignments] fetch error:', e.message);
@@ -321,14 +313,10 @@ const StudentAssignments = () => {
       );
       setSubmitModalVisible(false);
 
-      // Mark assignment as submitted locally so card updates immediately
       setAssignments(prev =>
-        prev.map(a =>
-          a.id === assignmentId ? {...a, submitted: true} : a,
-        ),
+        prev.map(a => (a.id === assignmentId ? {...a, submitted: true} : a)),
       );
 
-      // Auto-dismiss success toast after 3 seconds
       setSubmitSuccess('Assignment submitted successfully!');
       setTimeout(() => setSubmitSuccess(null), 3000);
     } catch (e) {
@@ -339,19 +327,25 @@ const StudentAssignments = () => {
     }
   };
 
+  // Submission History Fetcher
+  const fetchSubmittedAssignments = async () => {
+    try {
+      setHistoryLoading(true);
+      const data = await studentApi.getSubmittedAssignments(user?.id, user?.role, user?.email);
+      setSubmittedAssignments(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('[StudentAssignments] history fetch error:', e.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   // Counts
   const totalCount = assignments.length;
-  const overdueCount = assignments.filter(
-    a => getDaysInfo(a.dueDate)?.color === RED,
-  ).length;
-  const dueTodayCount = assignments.filter(
-    a => getDaysInfo(a.dueDate)?.label === 'Due today',
-  ).length;
-  const upcomingCount = assignments.filter(
-    a => getDaysInfo(a.dueDate)?.color === GREEN,
-  ).length;
+  const overdueCount = assignments.filter(a => getDaysInfo(a.dueDate)?.color === RED).length;
+  const dueTodayCount = assignments.filter(a => getDaysInfo(a.dueDate)?.label === 'Due today').length;
+  const upcomingCount = assignments.filter(a => getDaysInfo(a.dueDate)?.color === GREEN).length;
 
-  // Loading
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -362,7 +356,6 @@ const StudentAssignments = () => {
     );
   }
 
-  // Error
   if (error) {
     return (
       <View style={styles.centered}>
@@ -376,7 +369,6 @@ const StudentAssignments = () => {
     );
   }
 
-  // Improved empty state — no Retry button since fetch succeeded
   if (!loading && !refreshing && assignments.length === 0) {
     return (
       <View style={styles.centered}>
@@ -402,23 +394,17 @@ const StudentAssignments = () => {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryVal, {color: '#ffb3b3'}]}>
-            {overdueCount}
-          </Text>
+          <Text style={[styles.summaryVal, {color: '#ffb3b3'}]}>{overdueCount}</Text>
           <Text style={styles.summaryLabel}>Overdue</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryVal, {color: '#fde68a'}]}>
-            {dueTodayCount}
-          </Text>
+          <Text style={[styles.summaryVal, {color: '#fde68a'}]}>{dueTodayCount}</Text>
           <Text style={styles.summaryLabel}>Due Today</Text>
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryVal, {color: '#a8f0c0'}]}>
-            {upcomingCount}
-          </Text>
+          <Text style={[styles.summaryVal, {color: '#a8f0c0'}]}>{upcomingCount}</Text>
           <Text style={styles.summaryLabel}>Upcoming</Text>
         </View>
       </View>
@@ -454,6 +440,19 @@ const StudentAssignments = () => {
         }
       />
 
+      {/* History Action Footer Strip */}
+      <View style={styles.bottomContainer}>
+        <TouchableOpacity
+          style={styles.historyButton}
+          onPress={() => {
+            fetchSubmittedAssignments();
+            setHistoryVisible(true);
+          }}>
+          <MatIcon name="history" size={20} color={WHITE} />
+          <Text style={styles.historyButtonText}>My Submissions</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Image Preview Modal */}
       <Modal
         visible={!!previewImage}
@@ -461,17 +460,11 @@ const StudentAssignments = () => {
         animationType="fade"
         onRequestClose={() => setPreviewImage(null)}>
         <View style={styles.previewOverlay}>
-          <TouchableOpacity
-            style={styles.previewClose}
-            onPress={() => setPreviewImage(null)}>
+          <TouchableOpacity style={styles.previewClose} onPress={() => setPreviewImage(null)}>
             <MatIcon name="close-circle" size={32} color={WHITE} />
           </TouchableOpacity>
           {previewImage && (
-            <Image
-              source={{uri: previewImage}}
-              style={styles.previewImage}
-              resizeMode="contain"
-            />
+            <Image source={{uri: previewImage}} style={styles.previewImage} resizeMode="contain" />
           )}
         </View>
       </Modal>
@@ -488,6 +481,62 @@ const StudentAssignments = () => {
         submitting={submitting}
         submitError={submitError}
       />
+
+      {/* History Modal */}
+      <Modal visible={historyVisible} animationType="slide" onRequestClose={() => setHistoryVisible(false)}>
+        <View style={styles.historyContainer}>
+          
+          {/* Header */}
+          <View style={styles.historyHeader}>
+            <TouchableOpacity onPress={() => setHistoryVisible(false)}>
+              <MatIcon name="arrow-left" size={24} color={TEXT_DARK} />
+            </TouchableOpacity>
+            <Text style={styles.historyTitle}>Submission History</Text>
+            <View style={{width: 24}} />
+          </View>
+            
+          {historyLoading ? (
+            <View style={styles.centered}>
+              <ActivityIndicator size="large" color={PRIMARY} />
+            </View>
+          ) : (
+            <FlatList
+              data={submittedAssignments}
+              keyExtractor={item => item.id?.toString()}
+              contentContainerStyle={{ paddingBottom: 24 }}
+              renderItem={({item}) => (
+                <View style={styles.historyCard}>
+                  <Text style={styles.historyAssignment}>{item.assignmentTitle}</Text>
+                  <Text style={styles.historyRemarks}>{item.remarks}</Text>
+                  <Text style={styles.historyDate}>
+                    Submitted : {' '} {formatDisplay(item.submittedDate)}
+                  </Text>
+                  
+                  <View style={styles.historyFooter}>
+                    <View style={styles.statusBadge}>
+                      <Text style={styles.statusText}>{item.status || 'Submitted'}</Text>
+                    </View>
+                    
+                    <TouchableOpacity
+                      style={styles.editBtn}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        ToastAndroid.showWithGravity(
+                          'Please continue via the website.',
+                          ToastAndroid.LONG,
+                          ToastAndroid.BOTTOM
+                        );
+                        }}>
+                      <MatIcon name="pencil-outline" size={14} color={WHITE} />
+                      <Text style={styles.editBtnText}>Edit</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -495,52 +544,39 @@ const StudentAssignments = () => {
 // Styles
 const styles = StyleSheet.create({
   screen: {flex: 1, backgroundColor: GREY_1},
-  // Summary strip
   summaryCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
   summaryItem: { flex: 1, alignItems: 'center'},
   summaryVal: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 22, },
   summaryLabel: { fontSize: 11, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
   summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4, },
-  // Success toast
   successToast: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', marginHorizontal: 12, marginTop: 10, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, gap: 8, borderLeftWidth: 3, borderLeftColor: GREEN, },
   successToastText: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: GREEN, flex: 1, },
-  // List
   listContent: { padding: 12, paddingTop: 14, paddingBottom: 20 },
-  // Assignment card
   card: { backgroundColor: WHITE, borderRadius: 14, marginBottom: 10, overflow: 'hidden', elevation: 2, shadowColor: PRIMARY, shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.08, shadowRadius: 4, },
   cardContent: { flexDirection: 'row', padding: 12, gap: 10 },
-  // Thumbnail
   thumbWrap: { width: 70, height: 70, borderRadius: 10, overflow: 'hidden'},
   thumb: { width: '100%', height: '100%'},
   thumbOverlay: { position: 'absolute', bottom: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.4)', padding: 3, borderTopLeftRadius: 8, },
   thumbPlaceholder: { backgroundColor: PRIMARY_LIGHT, alignItems: 'center', justifyContent: 'center', },
-  // Card info
   cardInfo: { flex: 1},
   cardTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 3, },
   cardDesc: { fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginBottom: 5, lineHeight: 16, },
   datesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dateItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  // Bumped date/secondary text from 10 → 11 for readability
   dateText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT },
-  // Footer
   cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingBottom: 10, paddingTop: 4, borderTopWidth: 0.5, borderTopColor: GREY_2, },
   teacherRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flex: 1, marginRight: 8, },
-  // Bumped teacher text from 10 → 11
   teacherText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, flex: 1, },
   footerRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dueBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
-  // Bumped badge text from 10 → 11
   dueBadgeText: { fontSize: 11, fontFamily: 'Poppins-SemiBold'},
   submitChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, gap: 4, },
   submitChipText: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: WHITE },
-  // Submitted chip style
   submittedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, gap: 4, borderWidth: 1, borderColor: '#bbf7d0', },
   submittedChipText: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: GREEN },
-  // Image preview modal
   previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', },
   previewClose: { position: 'absolute', top: 40, right: 16, zIndex: 10 },
   previewImage: { width: '95%', height: '80%', borderRadius: 12 },
-  // Submit modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', },
   submitModal: { backgroundColor: WHITE, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32, },
   submitModalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, },
@@ -548,7 +584,6 @@ const styles = StyleSheet.create({
   submitModalTitle: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
   submitAssignmentName: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY_LIGHT, borderRadius: 8, padding: 10, marginBottom: 14, gap: 8, },
   submitAssignmentNameText: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: PRIMARY_DARK, flex: 1, },
-  // Error banner inside modal
   submitErrorBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fee2e2', borderRadius: 8, padding: 10, marginBottom: 12, gap: 8, borderLeftWidth: 3, borderLeftColor: RED, },
   submitErrorText: { fontSize: 12, fontFamily: 'Poppins-Regular', color: RED, flex: 1, },
   inputLabel: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: TEXT_MID, marginBottom: 6, },
@@ -557,15 +592,30 @@ const styles = StyleSheet.create({
   submitBtn: { backgroundColor: PRIMARY, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8, marginTop: 4, },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: WHITE, },
-  // Loading / Error
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, },
   loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
   errorText: { color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 12, marginBottom: 16, },
   retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 9, borderRadius: 20, },
   retryText: { color: WHITE, fontFamily: 'Poppins-SemiBold', fontSize: 13 },
-  // Empty state styles
   emptyTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 16, marginBottom: 8, },
   emptySubtext: { fontSize: 13, fontFamily: 'Poppins-Regular', color: TEXT_MID, textAlign: 'center', marginHorizontal: 40, lineHeight: 20, },
+  
+  // History Layout Styles
+  historyContainer: { flex: 1, backgroundColor: GREY_1 },
+  historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, backgroundColor: WHITE, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3 },
+  historyTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
+  historyCard: { backgroundColor: WHITE, marginHorizontal: 12, marginTop: 12, borderRadius: 12, padding: 14, elevation: 1, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2 },
+  historyAssignment: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
+  historyRemarks: { marginTop: 6, fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_MID, },
+  historyDate: { marginTop: 8, fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
+  historyFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, borderTopWidth: 0.5, borderTopColor: GREY_2, paddingTop: 10 },
+  statusBadge: { backgroundColor: '#dcfce7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, },
+  statusText: { color: GREEN, fontSize: 11, fontFamily: 'Poppins-SemiBold', },
+  editBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: PRIMARY, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 4 },
+  editBtnText: { color: WHITE, fontSize: 11, fontFamily: 'Poppins-SemiBold', },
+  bottomContainer: { padding: 12, backgroundColor: WHITE, borderTopWidth: 1, borderTopColor: GREY_2 },
+  historyButton: { backgroundColor: PRIMARY, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 14, borderRadius: 12, gap: 8 },
+  historyButtonText: { color: WHITE, fontSize: 14, fontFamily: 'Poppins-SemiBold', },
 });
 
 export default StudentAssignments;
