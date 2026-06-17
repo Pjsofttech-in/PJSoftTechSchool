@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Dimensions, Image, ScrollView, TextInput, ToastAndroid, KeyboardAvoidingView, StatusBar, RefreshControl } from 'react-native';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Dimensions, Image, ScrollView, TextInput, ToastAndroid, KeyboardAvoidingView, StatusBar, RefreshControl, Linking, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -141,6 +141,25 @@ export class TeacherAssignments extends Component {
       this.setState({ submissions: data, submissionsLoading: false });
     } catch (err) {
       this.setState({ submissionsLoading: false, submissionsError: 'Failed to load submissions.' });
+    }
+  };
+
+  handleViewAttachment = async (url) => {
+    if (!url) {
+      ToastAndroid.show(
+        'Attachment not available',
+        ToastAndroid.SHORT,
+      );
+      return;
+    }
+    
+    try {
+      await Linking.openURL(url);
+    } catch (error) {
+      ToastAndroid.show(
+        'Unable to open attachment',
+        ToastAndroid.SHORT,
+      );
     }
   };
 
@@ -441,6 +460,22 @@ export class TeacherAssignments extends Component {
                       <Text style={styles.submissionName}>{item.studentName}</Text>
                       <Text style={styles.submissionMeta}>Roll No: {item.rollNo} · {item.submittedDate}</Text>
                       {item.remarks ? <Text style={styles.submissionRemarks} numberOfLines={2}>{item.remarks}</Text> : null}
+                      {item.fileUrl ? (
+                      <Pressable
+                      onPress={() => this.handleViewAttachment(item.fileUrl)}
+                      android_ripple={RIPPLE_CONFIG}
+                      style={styles.attachmentRow}
+                      >
+                      <MatIcon
+                      name="paperclip"
+                      size={14}
+                      color={PRIMARY}
+                      />
+                      <Text style={styles.attachmentText}>
+                      View Attachment
+                      </Text>
+                      </Pressable>
+                    ) : null}
                     </View>
                     <View style={styles.submissionStatusBadge}><Text style={styles.submissionStatusText}>{item.status}</Text></View>
                   </View>
@@ -513,6 +548,8 @@ const styles = StyleSheet.create({
   submissionName: { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#1a1a2e' },
   submissionMeta: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#888', marginTop: 1 },
   submissionRemarks: { fontFamily: 'Poppins-Regular', fontSize: 11, color: '#666', marginTop: 3 },
+  attachmentRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, backgroundColor: '#ede9ff', },
+  attachmentText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: PRIMARY, marginLeft: 4, },
   submissionStatusBadge: { backgroundColor: '#e4ffed', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   submissionStatusText: { fontFamily: 'Poppins-Medium', fontSize: 11, color: '#2e7d32' },
 });
