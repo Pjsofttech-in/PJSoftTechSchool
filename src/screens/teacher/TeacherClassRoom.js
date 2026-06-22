@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Linking, Platform, StatusBar, RefreshControl, TextInput, Alert, KeyboardAvoidingView } from 'react-native';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Linking, Platform, StatusBar, RefreshControl, TextInput, Alert, KeyboardAvoidingView, Image  } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -8,9 +8,23 @@ import { applyClassroomFilters } from '@utils/classroomFilterUtils';
 
 const PRIMARY = '#7b68ee';
 const RIPPLE_CONFIG = { color: 'rgba(123, 104, 238, 0.15)', borderless: false };
+const AVATAR_COLORS = [ '#4285F4', '#EA4335', '#FBBC05', '#34A853', '#8E24AA', '#F4511E', '#039BE5', '#00897B', '#5E35B1', '#6D4C41' ];
+
+const getAvatarColor = (name = '') => {
+  if (!name) return '#607D8B';
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+};
 
 export const TeacherClassRoom = () => {
-  const user = useAuthStore((state) => state.user);
+  // Prevent global state updates from triggering wasteful re-renders
+  const userId = useAuthStore((state) => state.user?.id);
+  const userEmail = useAuthStore((state) => state.user?.email);
 
   // Core Data States
   const [allClassrooms, setAllClassrooms] = useState([]);
@@ -36,7 +50,7 @@ export const TeacherClassRoom = () => {
   const [selectedClassName, setSelectedClassName] = useState('');
   const [activeFilters, setActiveFilters] = useState({});
 
-  // Fetch Classrooms - decoupled from local filtering
+  // Fetch Classrooms
   const fetchClassrooms = useCallback(async (isSwiping = false) => {
     if (isSwiping) {
       setIsRefreshing(true);
@@ -44,16 +58,16 @@ export const TeacherClassRoom = () => {
       setLoading(true);
     }
     try {
-      if (!user?.id || !user?.email) return;
-      const data = await teacherApi.getClassRooms(user.id, user.email);
-      setAllClassrooms(data);
+      if (!userId || !userEmail) return;
+      const data = await teacherApi.getClassRooms(userId, userEmail);
+      setAllClassrooms(data || []);
     } catch (err) {
       console.error('[ClassRoomHub] Fetch Error:', err);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
-  }, [user?.id, user?.email]);
+  }, [userId, userEmail]);
 
   useEffect(() => {
     fetchClassrooms(false);
@@ -68,35 +82,35 @@ export const TeacherClassRoom = () => {
     fetchClassrooms(true);
   };
 
-  const handleFilterApply = (filters) => {
+  const handleFilterApply = useCallback((filters) => {
     setActiveFilters(filters);
-  };
+  }, []);
 
   // Student details modal fetch
-  const fetchStudents = async (classId, className) => {
+  const fetchStudents = useCallback(async (classId, className) => {
     setIsStudentModalVisible(true);
     setModalLoading(true);
     setSelectedClassName(className);
     setStudents([]);
     try {
-      const data = await teacherApi.getStudentsByClass(user.email, classId);
-      setStudents(data);
+      const data = await teacherApi.getStudentsByClass(userEmail, classId);
+      setStudents(data || []);
     } catch (err) {
       console.error('Fetch Students Error:', err);
     } finally {
       setModalLoading(false);
     }
-  };
+  }, [userEmail]);
 
   // Timetable schedule details fetch
-  const fetchTimetable = async (classId, className) => {
+  const fetchTimetable = useCallback(async (classId, className) => {
     setIsScheduleModalVisible(true);
     setModalLoading(true);
     setSelectedClassName(className);
     setTimetable([]);
     try {
-      const data = await teacherApi.getTimeTableByClassId(user.email, classId);
-      const sortedData = data.map(day => ({
+      const data = await teacherApi.getTimeTableByClassId(userEmail, classId);
+      const sortedData = (data || []).map(day => ({
         ...day,
         scheduledPeriods: [...day.scheduledPeriods].sort((a, b) => a.periodNo - b.periodNo)
       }));
@@ -106,10 +120,10 @@ export const TeacherClassRoom = () => {
     } finally {
       setModalLoading(false);
     }
-  };
+  }, [userEmail]);
 
   // Notification history modal
-  const fetchNotificationHistory = async (classId, className) => {
+  const fetchNotificationHistory = useCallback(async (classId, className) => {
     setIsNotifyModalVisible(true);
     setModalLoading(true);
     setSelectedClassId(classId);
@@ -118,9 +132,8 @@ export const TeacherClassRoom = () => {
     setNoticeDescription('');
     setNotices([]);
     try {
-      const data = await teacherApi.getNotificationsByClassRoom(user.email, classId);
+      const data = await teacherApi.getNotificationsByClassRoom(userEmail, classId);
       if (Array.isArray(data)) {
-        // Sort chronologically
         const sortedNotices = [...data].sort((a, b) => {
           const dateA = new Date(a.createdAt);
           const dateB = new Date(b.createdAt);
@@ -136,7 +149,7 @@ export const TeacherClassRoom = () => {
     } finally {
       setModalLoading(false);
     }
-  };
+  }, [userEmail]);
 
   // Submit Notice Event & Instant History Refresh
   const handleReleaseNotice = async () => {
@@ -153,9 +166,7 @@ export const TeacherClassRoom = () => {
         noticeDescription: noticeDescription.trim()
       };
 
-      const responseObj = await teacherApi.createNotification(user.email, payload);
-      
-      // Prepends the new notice
+      const responseObj = await teacherApi.createNotification(userEmail, payload);
       setNotices((prevNotices) => [responseObj, ...prevNotices]);
       setNoticeName('');
       setNoticeDescription('');
@@ -168,14 +179,14 @@ export const TeacherClassRoom = () => {
     }
   };
 
-  const makeCall = (phoneNumber) => {
+  const makeCall = useCallback((phoneNumber) => {
     if (!phoneNumber) {
-      alert('Contact number not available for this student');
+      Alert.alert('Unavailable', 'Contact number not available for this student');
       return;
     }
     const url = Platform.OS === 'android' ? `tel:${phoneNumber}` : `telprompt:${phoneNumber}`;
     Linking.openURL(url).catch((err) => console.error("Couldn't open dialer", err));
-  };
+  }, []);
 
   const renderActionButton = (icon, label, color, onPress) => (
     <Pressable 
@@ -213,26 +224,51 @@ export const TeacherClassRoom = () => {
         {renderActionButton('account-group-outline', 'Students', PRIMARY, () => fetchStudents(item.id, `${item.standard}-${item.division}`))}
       </View>
     </View>
-  ), [allClassrooms]);
+  ), [fetchNotificationHistory, fetchTimetable, fetchStudents]);
 
-  const renderStudentItem = useCallback(({ item }) => (
-    <View style={styles.studentItem}>
-      <View style={styles.studentAvatar}>
-        <Text style={styles.avatarText}>{item.fullName.charAt(0).toUpperCase()}</Text>
+  const renderStudentItem = useCallback(({ item }) => {
+    const photo = item.documentDTO?.studentPhoto;
+
+    return (
+      <View style={styles.studentItem}>
+        {photo ? (
+          <Image
+            source={{ uri: photo }}
+            style={styles.studentAvatarImage}
+            resizeMode="cover"
+          />
+        ) : (
+          <View
+            style={[
+              styles.studentAvatar,
+              { backgroundColor: getAvatarColor(item.fullName) },
+            ]}>
+            <Text style={styles.avatarText}>
+              {item.fullName?.charAt(0)?.toUpperCase() || '?'}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.studentInfo}>
+          <Text style={styles.studentName}>{item.fullName}</Text>
+          <Text style={styles.studentSub}>
+            Roll No: {item.rollNo} • {item.gender}
+          </Text>
+        </View>
+
+        <Pressable
+          android_ripple={{ borderless: true, radius: 20 }}
+          style={styles.callButtonContainer}
+          onPress={() => makeCall(item.contact)}>
+          <MatIcon
+            name="phone-outline"
+            size={22}
+            color={item.contact ? '#4caf50' : '#ccc'}
+          />
+        </Pressable>
       </View>
-      <View style={styles.studentInfo}>
-        <Text style={styles.studentName}>{item.fullName}</Text>
-        <Text style={styles.studentSub}>Roll No: {item.rollNo}  •  {item.gender}</Text>
-      </View>
-      <Pressable 
-        android_ripple={{ borderless: true, radius: 20 }} 
-        style={styles.callButtonContainer} 
-        onPress={() => makeCall(item.contact)}
-      >
-        <MatIcon name="phone-outline" size={22} color={item.contact ? '#4caf50' : '#ccc'} />
-      </Pressable>
-    </View>
-  ), []);
+    );
+  }, [makeCall]);
 
   const renderNoticeItem = useCallback(({ item }) => (
     <View style={styles.noticeCard}>
@@ -283,7 +319,7 @@ export const TeacherClassRoom = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#f4f5f9" barStyle="dark-content" />
-      <ClassroomFilterBar email={user?.email} onApply={handleFilterApply} />
+      <ClassroomFilterBar email={userEmail} onApply={handleFilterApply} />
 
       {loading ? (
         <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
@@ -321,7 +357,7 @@ export const TeacherClassRoom = () => {
             <FlatList
               data={students}
               renderItem={renderStudentItem}
-              ListEmptyComponent={() => renderEmptyState('account-search-outline', 'No students found in this class')}
+              ListEmptyComponent={renderEmptyState('account-search-outline', 'No students found in this class')}
               keyExtractor={(item) => item.id.toString()}
               contentContainerStyle={{ padding: 16 }}
             />
@@ -345,7 +381,7 @@ export const TeacherClassRoom = () => {
             <FlatList
               data={timetable}
               renderItem={renderDayItem}
-              ListEmptyComponent={() => renderEmptyState('calendar-remove-outline', 'No schedule created for this class yet.')}
+              ListEmptyComponent={renderEmptyState('calendar-remove-outline', 'No schedule created for this class yet.')}
               keyExtractor={(item, index) => index.toString()}
               contentContainerStyle={{ padding: 16 }}
             />
@@ -414,7 +450,7 @@ export const TeacherClassRoom = () => {
               data={notices}
               renderItem={renderNoticeItem}
               keyExtractor={(item, idx) => item.id?.toString() || idx.toString()}
-              ListEmptyComponent={() => renderEmptyState('bell-off-outline', 'No notifications posted to this classroom yet.')}
+              ListEmptyComponent={renderEmptyState('bell-off-outline', 'No notifications posted to this classroom yet.')}
               contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
             />
           )}
@@ -447,7 +483,6 @@ const styles = StyleSheet.create({
   actionIconPadding: { padding: 12, borderRadius: 24 },
   actionBarTitle: { fontSize: 18, fontFamily: 'Poppins-SemiBold', fontWeight: '600', color: '#1a1a2e', marginLeft: 8 },
   studentItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', padding: 12, borderRadius: 8, marginBottom: 10, elevation: 1 },
-  studentAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: PRIMARY, justifyContent: 'center', alignItems: 'center' },
   avatarText: { color: '#fff', fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 15 },
   studentInfo: { flex: 1, marginLeft: 12 },
   studentName: { fontSize: 14, fontFamily: 'Poppins-SemiBold', fontWeight: '600', color: '#1a1a2e' },
@@ -467,7 +502,9 @@ const styles = StyleSheet.create({
   periodTeacher: { fontSize: 11, color: '#666', fontFamily: 'Poppins-Regular', fontWeight: '400', marginTop: 2 },
   periodNumberBadge: { backgroundColor: '#ede9ff', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   periodNumberText: { fontSize: 11, color: PRIMARY, fontFamily: 'Poppins-SemiBold', fontWeight: '600' },
-  
+  studentAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: '#E5E5E5' },
+  studentAvatarImage: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#E5E5E5' },
+
   // Notice Modal Layout Items
   formContainer: { backgroundColor: '#fff', padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e5e5', elevation: 1 },
   sectionHeading: { fontSize: 13, fontFamily: 'Poppins-SemiBold', fontWeight: '600', color: '#444', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
