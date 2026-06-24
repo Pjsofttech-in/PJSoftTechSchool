@@ -35,7 +35,7 @@ const SubjectChips = React.memo(({ subjects }) => (
   </View>
 ));
 
-// Individual subject row
+// Individual subject row inside the student card
 const StudentSubjectRow = React.memo(({ detail, teacherSubjectNames, onEdit }) => {
   const targetId = detail.subjectId; 
 
@@ -126,7 +126,7 @@ const ExamItemRow = React.memo(({ item, onFetchResults }) => {
       <Pressable
         android_ripple={SOLID_RIPPLE}
         style={styles.showResultBtn}
-        onPress={() => onFetchResults(item.id, item.examName)}
+        onPress={() => onFetchResults(item.id, item.examName, item.subjects || [])}
       >
         <MatIcon name="chart-bar" size={16} color="#fff" />
         <Text style={styles.showResultBtnText}>Open Grade Roster</Text>
@@ -135,13 +135,31 @@ const ExamItemRow = React.memo(({ item, onFetchResults }) => {
   );
 });
 
-const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHistory, teacherSubjectNames }) => {
+const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHistory, teacherSubjectNames, activeExamSubjects }) => {
   const notAttempted = item.overAllStatus === 'Not Attempted';
   const passed = item.overAllStatus === 'Pass';
 
   const handleSubjectEditPress = (subId, subName, maxM, currM) => {
     onOpenSingleSubjectAssign(item, subId, subName, maxM, currM);
   };
+
+  const teacherSubjectExistsInDetails = item.details?.some(detail => 
+    teacherSubjectNames.some(name => name?.trim().toLowerCase() === detail.subjectName?.trim().toLowerCase())
+  );
+
+  let fallbackSubjectConfig = null;
+  if (!teacherSubjectExistsInDetails) {
+    const matchedExamSubject = activeExamSubjects.find(sub => 
+      teacherSubjectNames.some(name => name?.trim().toLowerCase() === sub.subjectName?.trim().toLowerCase())
+    );
+    if (matchedExamSubject) {
+      fallbackSubjectConfig = {
+        subjectId: matchedExamSubject.id,
+        subjectName: matchedExamSubject.subjectName,
+        maxMarks: matchedExamSubject.maxMarks || 100
+      };
+    }
+  }
 
   return (
     <View style={styles.resultItem}>
@@ -176,7 +194,7 @@ const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHisto
       </View>
 
       <View style={styles.subjectBreakdownContainer}>
-        {item.details && item.details.length > 0 ? (
+        {item.details && item.details.length > 0 && (
           item.details.map((detail, idx) => (
             <StudentSubjectRow 
               key={idx} 
@@ -185,7 +203,27 @@ const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHisto
               onEdit={handleSubjectEditPress} 
             />
           ))
-        ) : (
+        )}
+
+        {fallbackSubjectConfig && (
+          <View style={[styles.subjectItemRow, styles.fallbackHighlightRow]}>
+            <View style={styles.subjectItemLeft}>
+              <Text style={[styles.detailText, styles.highlightedSubjectText]}>
+                {fallbackSubjectConfig.subjectName}: <Text style={styles.boldText}>Not Allotted</Text>/{fallbackSubjectConfig.maxMarks}
+              </Text>
+              <Text style={styles.editableTag}>Assigned to you</Text>
+            </View>
+            <Pressable 
+              android_ripple={CIRCLE_RIPPLE} 
+              style={[styles.inlineEditIconBtn, { backgroundColor: '#E8F5E9' }]}
+              onPress={() => handleSubjectEditPress(fallbackSubjectConfig.subjectId, fallbackSubjectConfig.subjectName, fallbackSubjectConfig.maxMarks, '')}
+            >
+              <MatIcon name="plus-circle" size={18} color="#146C2E" />
+            </Pressable>
+          </View>
+        )}
+
+        {(!item.details || item.details.length === 0) && !fallbackSubjectConfig && (
           <Text style={styles.noSubjectWarning}>No marks records populated for this student.</Text>
         )}
       </View>
@@ -221,6 +259,7 @@ const TeacherResultContent = () => {
   const [error, setError] = useState(null);
 
   const [teacherSubjectNames, setTeacherSubjectNames] = useState([]);
+  const [activeExamSubjects, setActiveExamSubjects] = useState([]); 
 
   const [isExamsModalVisible, setIsExamsModalVisible] = useState(false);
   const [exams, setExams] = useState([]);
@@ -282,12 +321,16 @@ const TeacherResultContent = () => {
     }
   }, [user?.email]);
 
-  const fetchResults = useCallback(async (examId, examName) => {
+  const fetchResults = useCallback(async (examId, examName, subjectsList = []) => {
     setIsResultsModalVisible(true);
     setResultsLoading(true);
     setResults([]);
     setSelectedExamId(examId);
     setSelectedExamName(examName);
+    
+    if (subjectsList && subjectsList.length > 0) {
+      setActiveExamSubjects(subjectsList);
+    }
     try {
       if (!user?.email || !selectedClassId) return;
       const data = await teacherApi.getResultByClassroom(user.email, selectedClassId, examId);
@@ -308,14 +351,6 @@ const TeacherResultContent = () => {
 
   const submitSingleSubjectMarks = async () => {
     const obtainedMarks = Number(singleMarksInput || 0);
-
-    if (obtainedMarks > targetSubjectConfig.maxMarks) {
-      ToastAndroid.show(
-        `${targetSubjectConfig.name} marks cannot exceed ${targetSubjectConfig.maxMarks}`,
-        ToastAndroid.LONG
-      );
-      return;
-    }
 
     try {
       setAssignLoading(true);
@@ -380,8 +415,9 @@ const TeacherResultContent = () => {
       onOpenSingleSubjectAssign={openSingleSubjectAssign} 
       onOpenHistory={openStudentHistory} 
       teacherSubjectNames={teacherSubjectNames} 
+      activeExamSubjects={activeExamSubjects}
     />
-  ), [openSingleSubjectAssign, openStudentHistory, teacherSubjectNames]);
+  ), [openSingleSubjectAssign, openStudentHistory, teacherSubjectNames, activeExamSubjects]);
 
   if (error) {
     return (
@@ -506,7 +542,7 @@ const TeacherResultContent = () => {
             <Text style={styles.dialogSub}>{selectedStudent?.studentName}</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{targetSubjectConfig.name} (Max: {targetSubjectConfig.maxMarks})</Text>
+              <Text style={styles.inputLabel}>{targetSubjectConfig.name}</Text>
               <TextInput
                 style={styles.textInputAndroid}
                 keyboardType="numeric"
@@ -640,6 +676,7 @@ const styles = StyleSheet.create({
   marksText: { fontSize: 13, color: '#49454F', marginTop: 4, fontFamily: 'Poppins-Regular' },
   subjectBreakdownContainer: { paddingHorizontal: 16, paddingBottom: 12, gap: 6 },
   subjectItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.5, borderColor: SURFACE_VARIANT },
+  fallbackHighlightRow: { borderBottomWidth: 1, borderStyle: 'dashed', borderColor: '#A5D6A7', paddingVertical: 10 },
   subjectItemLeft: { flex: 1 },
   detailText: { fontSize: 13, color: '#49454F', fontFamily: 'Poppins-Regular' },
   highlightedSubjectText: { color: '#146C2E', fontFamily: 'Poppins-Medium' },
