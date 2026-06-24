@@ -25,74 +25,103 @@ const getExamBadgeStyles = (type) => {
   }
 };
 
-// Structural Leaves
 const SubjectChips = React.memo(({ subjects }) => (
   <View style={styles.subjectsRow}>
-    {subjects?.map((sub) => (
-      <View key={sub.id} style={styles.subjectChip}>
-        <Text style={styles.subjectChipText}>{sub.subjectName} ({sub.maxMarks}M)</Text>
+    {subjects?.map((sub, idx) => (
+      <View key={sub.id || idx} style={styles.subjectChip}>
+        <Text style={styles.subjectChipText}>{sub.subjectName || sub} ({sub.maxMarks || '?'}M)</Text>
       </View>
     ))}
   </View>
 ));
 
-const StudentDetails = React.memo(({ details }) => (
-  <View style={styles.detailsList}>
-    {details?.map((d, i) => (
-      <Text key={i} style={styles.detailText}>
-        {d.subjectName}: <Text style={styles.boldText}>{d.obtainedMarks}</Text>/{d.maxMarks}
-      </Text>
-    ))}
-  </View>
-));
+// Individual subject row
+const StudentSubjectRow = React.memo(({ detail, teacherSubjectNames, onEdit }) => {
+  const targetId = detail.subjectId; 
 
-const ClassItemRow = React.memo(({ item, onFetchExams }) => (
-  <View style={styles.card}>
-    <View style={styles.cardHeader}>
-      <View style={styles.standardCircle}>
-        <Text style={styles.standardText}>{item.standard}</Text>
+  const isTeacherSubject = teacherSubjectNames.some(
+    name => name?.trim().toLowerCase() === detail.subjectName?.trim().toLowerCase()
+  );
+
+  return (
+    <View style={styles.subjectItemRow}>
+      <View style={styles.subjectItemLeft}>
+        <Text style={[styles.detailText, isTeacherSubject && styles.highlightedSubjectText]}>
+          {detail.subjectName}: <Text style={styles.boldText}>{detail.obtainedMarks}</Text>/{detail.maxMarks}
+        </Text>
+        {isTeacherSubject && <Text style={styles.editableTag}>Assigned to you</Text>}
       </View>
-      <View style={styles.headerText}>
-        <Text style={styles.mainTitle}>Division {item.division} • {item.medium}</Text>
-        <View style={styles.timeRow}>
-          <MatIcon name="clock-outline" size={14} color={OUTLINE} />
-          <Text style={styles.subTitle}>{item.startTime} - {item.endTime}</Text>
+      
+      {isTeacherSubject ? (
+        <Pressable 
+          android_ripple={CIRCLE_RIPPLE} 
+          style={styles.inlineEditIconBtn}
+          onPress={() => onEdit(targetId, detail.subjectName, detail.maxMarks, detail.obtainedMarks)}
+        >
+          <MatIcon name="pencil" size={16} color={PRIMARY} />
+        </Pressable>
+      ) : (
+        <View style={styles.viewOnlyBadge}>
+          <Text style={styles.viewOnlyText}>View Only</Text>
+        </View>
+      )}
+    </View>
+  );
+});
+
+const ClassItemRow = React.memo(({ item, onFetchExams, userEmail }) => {
+  const mapping = item.teacherSubjectMappings?.find(t => t.teacherEmail === userEmail);
+  const teacherSubjectNames = mapping?.subjects ?? [];
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={styles.standardCircle}>
+          <Text style={styles.standardText}>{item.standard}</Text>
+        </View>
+        <View style={styles.headerText}>
+          <Text style={styles.mainTitle}>Division {item.division} • {item.medium}</Text>
+          <View style={styles.timeRow}>
+            <MatIcon name="clock-outline" size={14} color={OUTLINE} />
+            <Text style={styles.subTitle}>{item.startTime} - {item.endTime}</Text>
+          </View>
+        </View>
+        <View style={styles.yearBadge}>
+          <Text style={styles.yearText}>{item.year}</Text>
         </View>
       </View>
-      <View style={styles.yearBadge}>
-        <Text style={styles.yearText}>{item.year}</Text>
-      </View>
-    </View>
 
-    <Pressable 
-      android_ripple={SOLID_RIPPLE}
-      style={styles.outlineActionButton} 
-      onPress={() => onFetchExams(item.id, `${item.standard} - ${item.division}`)}
-    >
-      <Text style={styles.outlineButtonText}>View Performance & Exams</Text>
-      <MatIcon name="arrow-right" size={18} color={PRIMARY} />
-    </Pressable>
-  </View>
-));
+      <Pressable 
+        android_ripple={SOLID_RIPPLE}
+        style={styles.outlineActionButton} 
+        onPress={() => onFetchExams(item.id, `${item.standard} - ${item.division}`, teacherSubjectNames)}
+      >
+        <Text style={styles.outlineButtonText}>View Performance & Exams</Text>
+        <MatIcon name="arrow-right" size={18} color={PRIMARY} />
+      </Pressable>
+    </View>
+  );
+});
 
 const ExamItemRow = React.memo(({ item, onFetchResults }) => {
   const badgeStyle = getExamBadgeStyles(item.examType);
+
   return (
     <View style={styles.examCard}>
       <View style={styles.examHeader}>
         <View style={[styles.examTypeBadge, badgeStyle.badge]}>
-          <Text style={[styles.examTypeText, badgeStyle.text]}>{item.examType}</Text>
+          <Text style={[styles.examTypeText, badgeStyle.text]}>{item.examType || 'Exam'}</Text>
         </View>
         <View style={styles.flexTextContainer}>
           <Text style={styles.examName}>{item.examName}</Text>
           <View style={styles.examDateRow}>
             <MatIcon name="calendar-clock" size={12} color={OUTLINE} />
-            <Text style={styles.examDate}>{item.examDate}</Text>
+            <Text style={styles.examDate}>{item.examDate || 'No date scheduled'}</Text>
           </View>
         </View>
       </View>
 
-      <SubjectChips subjects={item.subjects} />
+      <SubjectChips subjects={item.subjects || []} />
 
       <Pressable
         android_ripple={SOLID_RIPPLE}
@@ -106,9 +135,13 @@ const ExamItemRow = React.memo(({ item, onFetchResults }) => {
   );
 });
 
-const ResultItemRow = React.memo(({ item, onOpenAssign, onOpenHistory }) => {
+const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHistory, teacherSubjectNames }) => {
   const notAttempted = item.overAllStatus === 'Not Attempted';
   const passed = item.overAllStatus === 'Pass';
+
+  const handleSubjectEditPress = (subId, subName, maxM, currM) => {
+    onOpenSingleSubjectAssign(item, subId, subName, maxM, currM);
+  };
 
   return (
     <View style={styles.resultItem}>
@@ -126,7 +159,6 @@ const ResultItemRow = React.memo(({ item, onOpenAssign, onOpenHistory }) => {
                 Aggregated Score: <Text style={styles.boldText}>{item.totalObtained}/{item.totalMax}</Text> ({item.percentage}%)
               </Text>
             )}
-            {item.details && item.details.length > 0 && <StudentDetails details={item.details} />}
           </View>
         </View>
 
@@ -143,25 +175,29 @@ const ResultItemRow = React.memo(({ item, onOpenAssign, onOpenHistory }) => {
         </View>
       </View>
 
+      <View style={styles.subjectBreakdownContainer}>
+        {item.details && item.details.length > 0 ? (
+          item.details.map((detail, idx) => (
+            <StudentSubjectRow 
+              key={idx} 
+              detail={detail} 
+              teacherSubjectNames={teacherSubjectNames} 
+              onEdit={handleSubjectEditPress} 
+            />
+          ))
+        ) : (
+          <Text style={styles.noSubjectWarning}>No marks records populated for this student.</Text>
+        )}
+      </View>
+
       <View style={styles.inlineActionRow}>
-        <Pressable 
-          android_ripple={SOLID_RIPPLE} 
-          style={styles.inlineButton}
-          onPress={() => onOpenAssign(item)}
-        >
-          <MatIcon name="playlist-edit" size={16} color={PRIMARY} />
-          <Text style={styles.inlineButtonText}>Assign Marks</Text>
-        </Pressable>
-
-        <View style={styles.inlineDivider} />
-
         <Pressable 
           android_ripple={SOLID_RIPPLE} 
           style={styles.inlineButton}
           onPress={() => onOpenHistory(item)}
         >
           <MatIcon name="trending-up" size={16} color={PRIMARY} />
-          <Text style={styles.inlineButtonText}>View History</Text>
+          <Text style={styles.inlineButtonText}>View Performance History</Text>
         </Pressable>
       </View>
     </View>
@@ -174,7 +210,6 @@ const BatchHeader = React.memo(() => (
   </View>
 ));
 
-// Core Screen Component
 const TeacherResultContent = () => {
   const user = useAuthStore((state) => state.user);
   const navigation = useNavigation();
@@ -184,6 +219,8 @@ const TeacherResultContent = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  const [teacherSubjectNames, setTeacherSubjectNames] = useState([]);
 
   const [isExamsModalVisible, setIsExamsModalVisible] = useState(false);
   const [exams, setExams] = useState([]);
@@ -199,7 +236,8 @@ const TeacherResultContent = () => {
 
   const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [marksInput, setMarksInput] = useState({}); 
+  const [targetSubjectConfig, setTargetSubjectConfig] = useState({ id: null, name: '', maxMarks: 0 });
+  const [singleMarksInput, setSingleMarksInput] = useState('');
   const [assignLoading, setAssignLoading] = useState(false);
 
   const [isHistoryModalVisible, setIsHistoryModalVisible] = useState(false);
@@ -226,12 +264,13 @@ const TeacherResultContent = () => {
     fetchClassrooms(false);
   }, [fetchClassrooms]);
 
-  const fetchExams = useCallback(async (classId, className) => {
+  const fetchExams = useCallback(async (classId, className, namesList) => {
     setIsExamsModalVisible(true);
     setExamsLoading(true);
     setExams([]);
     setSelectedClassId(classId);
     setSelectedClassName(className);
+    setTeacherSubjectNames(namesList);
     try {
       if (!user?.email) return;
       const data = await teacherApi.getExamByClassId(user.email, classId);
@@ -260,97 +299,57 @@ const TeacherResultContent = () => {
     }
   }, [user?.email, selectedClassId]);
 
-  const openAssignMarks = useCallback((student) => {
-  setSelectedStudent(student);
+  const openSingleSubjectAssign = useCallback((student, subjectId, subjectName, maxMarks, currentMarks) => {
+    setSelectedStudent(student);
+    setTargetSubjectConfig({ id: subjectId, name: subjectName, maxMarks });
+    setSingleMarksInput(currentMarks?.toString() || '');
+    setIsAssignModalVisible(true);
+  }, []);
 
-  const initialInput = {};
+  const submitSingleSubjectMarks = async () => {
+    const obtainedMarks = Number(singleMarksInput || 0);
 
-  student.details?.forEach(d => {
-    initialInput[d.subjectId] =
-      d.obtainedMarks?.toString() || '';
-  });
-
-  setMarksInput(initialInput);
-  setIsAssignModalVisible(true);
-}, []);
-
-  const submitAssignedMarks = async () => {
-  try {
-    setAssignLoading(true);
-
-    for (const subject of selectedStudent.details) {
-
-      const subjectId = subject.subjectId;
-
-      const obtainedMarks = Number(
-        marksInput[subjectId] || 0
+    if (obtainedMarks > targetSubjectConfig.maxMarks) {
+      ToastAndroid.show(
+        `${targetSubjectConfig.name} marks cannot exceed ${targetSubjectConfig.maxMarks}`,
+        ToastAndroid.LONG
       );
+      return;
+    }
 
-      // Validation
-      if (obtainedMarks > subject.maxMarks) {
-        ToastAndroid.show(
-          `${subject.subjectName} marks cannot exceed ${subject.maxMarks}`,
-          ToastAndroid.LONG
-        );
-        return;
-      }
-
+    try {
+      setAssignLoading(true);
       const payload = {
         studentId: selectedStudent.studentId,
         examId: selectedExamId,
-        subjectId: subjectId,
+        subjectId: targetSubjectConfig.id,
         obtainedMarks: obtainedMarks,
       };
 
-      console.log("Payload =>", payload);
-
-      await teacherApi.submitMarkByTeacher(
-        user.email,
-        payload
-      );
+      await teacherApi.submitMarkByTeacher(user.email, payload);
+      ToastAndroid.show('Marks successfully updated!', ToastAndroid.SHORT);
+      setIsAssignModalVisible(false);
+      
+      await fetchResults(selectedExamId, selectedExamName);
+    } catch (err) {
+      ToastAndroid.show(err.message || 'Failed to submit marks', ToastAndroid.LONG);
+    } finally {
+      setAssignLoading(false);
     }
-
-    ToastAndroid.show(
-      'Marks submitted successfully',
-      ToastAndroid.SHORT
-    );
-
-    setIsAssignModalVisible(false);
-
-    await fetchResults(
-      selectedExamId,
-      selectedExamName
-    );
-
-  } catch (err) {
-    console.log("Submit Error =>", err);
-
-    ToastAndroid.show(
-      err.message || 'Failed to submit marks',
-      ToastAndroid.LONG
-    );
-  } finally {
-    setAssignLoading(false);
-  }
-};
+  };
 
   const openStudentHistory = useCallback(async (student) => {
     if (!student?.studentId) {
       ToastAndroid.show('Invalid student selection identifier.', ToastAndroid.SHORT);
       return;
     }
-
     setSelectedStudent(student);
     setIsHistoryModalVisible(true);
     setHistoryLoading(true);
     setHistoryRecords([]);
-
     try {
       if (!user?.email) return;
-      
-      // Fetch data
       const responseData = await teacherApi.getResultByStudentAndAcademicYear(user.email, student.studentId);
-      
       if (Array.isArray(responseData)) {
         const formattedRecords = responseData.map(record => ({
           exam: record.examName || 'Assessment Block',
@@ -368,27 +367,28 @@ const TeacherResultContent = () => {
   }, [user?.email]);
 
   const dynamicClassRenderer = useCallback(({ item }) => (
-    <ClassItemRow item={item} onFetchExams={fetchExams} />
-  ), [fetchExams]);
+    <ClassItemRow item={item} onFetchExams={fetchExams} userEmail={user?.email} />
+  ), [fetchExams, user?.email]);
 
   const dynamicExamRenderer = useCallback(({ item }) => (
     <ExamItemRow item={item} onFetchResults={fetchResults} />
   ), [fetchResults]);
 
   const dynamicResultRenderer = useCallback(({ item }) => (
-    <ResultItemRow item={item} onOpenAssign={openAssignMarks} onOpenHistory={openStudentHistory} />
-  ), [openAssignMarks, openStudentHistory]);
+    <ResultItemRow 
+      item={item} 
+      onOpenSingleSubjectAssign={openSingleSubjectAssign} 
+      onOpenHistory={openStudentHistory} 
+      teacherSubjectNames={teacherSubjectNames} 
+    />
+  ), [openSingleSubjectAssign, openStudentHistory, teacherSubjectNames]);
 
   if (error) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top }]}>
         <MatIcon name="wifi-off" size={40} color={OUTLINE} />
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable
-          android_ripple={SOLID_RIPPLE}
-          style={styles.errorRetryBtn}
-          onPress={() => fetchClassrooms(false)}
-        >
+        <Pressable android_ripple={SOLID_RIPPLE} style={styles.errorRetryBtn} onPress={() => fetchClassrooms(false)}>
           <MatIcon name="refresh" size={18} color="#fff" />
           <Text style={styles.showResultBtnText}>Retry connection</Text>
         </Pressable>
@@ -401,11 +401,7 @@ const TeacherResultContent = () => {
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
       
       <View style={[styles.appbar, { paddingTop: Math.max(12, insets.top) }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          android_ripple={CIRCLE_RIPPLE}
-        >
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} android_ripple={CIRCLE_RIPPLE}>
           <MatIcon name="arrow-left" size={24} color={PRIMARY} />
         </Pressable>
         <Text style={styles.appbartitle}>Performance Matrix</Text>
@@ -427,23 +423,13 @@ const TeacherResultContent = () => {
             </View>
           }
           refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={fetchClassrooms} 
-              colors={SPINNER_COLORS}
-              tintColor={PRIMARY}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={fetchClassrooms} colors={SPINNER_COLORS} tintColor={PRIMARY} />
           }
         />
       )}
 
-      {/* Exams Bottom Sheet */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isExamsModalVisible}
-        onRequestClose={() => setIsExamsModalVisible(false)}
-      >
+      {/* Exams Modal */}
+      <Modal animationType="slide" transparent={true} visible={isExamsModalVisible} onRequestClose={() => setIsExamsModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.85, paddingBottom: insets.bottom + 12 }]}>
             <View style={styles.dragHandle} />
@@ -477,13 +463,8 @@ const TeacherResultContent = () => {
         </View>
       </Modal>
 
-      {/* Grade Roster Sheet */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isResultsModalVisible}
-        onRequestClose={() => setIsResultsModalVisible(false)}
-      >
+      {/* Grade Roster Modal */}
+      <Modal animationType="slide" transparent={true} visible={isResultsModalVisible} onRequestClose={() => setIsResultsModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.92, paddingBottom: insets.bottom + 12 }]}>
             <View style={styles.dragHandle} />
@@ -508,7 +489,7 @@ const TeacherResultContent = () => {
                 ListEmptyComponent={
                   <View style={styles.emptyBox}>
                     <MatIcon name="account-off-outline" size={40} color={OUTLINE} />
-                    <Text style={styles.emptyText}>No registered students tracked inside matrix.</Text>
+                    <Text style={styles.emptyText}>No registered students tracked.</Text>
                   </View>
                 }
               />
@@ -517,45 +498,32 @@ const TeacherResultContent = () => {
         </View>
       </Modal>
 
-      {/* Assign Marks Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={isAssignModalVisible}
-        onRequestClose={() => setIsAssignModalVisible(false)}
-      >
+      {/* Single Subject Assign Marks Dialog Modal */}
+      <Modal animationType="fade" transparent={true} visible={isAssignModalVisible} onRequestClose={() => setIsAssignModalVisible(false)}>
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogCard}>
-            <Text style={styles.dialogTitle}>Assign Marks</Text>
+            <Text style={styles.dialogTitle}>Update Subject Marks</Text>
             <Text style={styles.dialogSub}>{selectedStudent?.studentName}</Text>
 
-            {selectedStudent?.details?.map((sub) => {
-              const id = sub.subjectId;
-              return (
-                <View key={id} style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>{sub.subjectName} (Max: {sub.maxMarks})</Text>
-                  <TextInput
-                    style={styles.textInputAndroid}
-                    keyboardType="numeric"
-                    placeholder="Enter marks"
-                    value={marksInput[id] || ''}
-                    onChangeText={(text) => {
-                      const numericValue = text.replace(/[^0-9]/g, '');
-                      setMarksInput(prev => ({
-                        ...prev,
-                        [id]: numericValue,
-                      }));
-                    }}
-                  />
-                </View>
-              );
-            })}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>{targetSubjectConfig.name} (Max: {targetSubjectConfig.maxMarks})</Text>
+              <TextInput
+                style={styles.textInputAndroid}
+                keyboardType="numeric"
+                placeholder="Enter new obtained mark"
+                value={singleMarksInput}
+                onChangeText={(text) => {
+                  const numericValue = text.replace(/[^0-9]/g, '');
+                  setSingleMarksInput(numericValue);
+                }}
+              />
+            </View>
 
             <View style={styles.dialogActions}>
               <Pressable style={styles.dialogBtn} android_ripple={SOLID_RIPPLE} onPress={() => setIsAssignModalVisible(false)}>
                 <Text style={[styles.dialogBtnText, { color: OUTLINE }]}>Cancel</Text>
               </Pressable>
-              <Pressable style={styles.dialogBtn} android_ripple={SOLID_RIPPLE} onPress={submitAssignedMarks} disabled={assignLoading}>
+              <Pressable style={styles.dialogBtn} android_ripple={SOLID_RIPPLE} onPress={submitSingleSubjectMarks} disabled={assignLoading}>
                 {assignLoading ? <ActivityIndicator size="small" color={PRIMARY} /> : <Text style={styles.dialogBtnText}>Save</Text>}
               </Pressable>
             </View>
@@ -563,13 +531,8 @@ const TeacherResultContent = () => {
         </View>
       </Modal>
 
-      {/* Student History Sheet */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isHistoryModalVisible}
-        onRequestClose={() => setIsHistoryModalVisible(false)}
-      >
+      {/* Student History Modal */}
+      <Modal animationType="slide" transparent={true} visible={isHistoryModalVisible} onRequestClose={() => setIsHistoryModalVisible(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, styles.historyContainer, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.dragHandle} />
@@ -622,15 +585,12 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   errorText: { color: OUTLINE, marginTop: 12, textAlign: 'center', fontSize: 14, fontFamily: 'Poppins-Regular' },
   errorRetryBtn: { backgroundColor: PRIMARY, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 10, gap: 8, marginTop: 20 },
-  
   appbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 16, backgroundColor: '#ffffff', borderBottomWidth: 1, borderColor: SURFACE_VARIANT },
   backBtn: { padding: 6, borderRadius: 24 },
   appbartitle: { flex: 1, fontSize: 20, color: '#1C1B1F', marginLeft: 8, fontFamily: 'Poppins-SemiBold' },
-  
   sectionHeader: { paddingTop: 8, paddingBottom: 12 },
   sectionTitle: { fontSize: 14, color: PRIMARY, letterSpacing: 0.15, fontFamily: 'Poppins-SemiBold' },
   listPadding: { paddingHorizontal: 16, paddingTop: 8 },
-
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: SURFACE_VARIANT },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   standardCircle: { width: 40, height: 40, borderRadius: 20, backgroundColor: SURFACE_VARIANT, justifyContent: 'center', alignItems: 'center' },
@@ -641,10 +601,8 @@ const styles = StyleSheet.create({
   subTitle: { fontSize: 13, color: '#49454F', fontFamily: 'Poppins-Regular' },
   yearBadge: { backgroundColor: SURFACE_VARIANT, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   yearText: { fontSize: 11, color: '#49454F', fontFamily: 'Poppins-SemiBold' },
-  
   outlineActionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 10, gap: 8, borderWidth: 1, borderColor: PRIMARY },
   outlineButtonText: { color: PRIMARY, fontSize: 14, fontFamily: 'Poppins-SemiBold' },
-  
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.32)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 8 },
   dragHandle: { width: 32, height: 4, backgroundColor: OUTLINE, borderRadius: 2, alignSelf: 'center', marginBottom: 16, opacity: 0.4 },
@@ -655,7 +613,6 @@ const styles = StyleSheet.create({
   bottomListPadding: { paddingBottom: 32 },
   flexTextContainer: { flex: 1, marginLeft: 12 },
   headerTitleWrap: { flex: 1, marginRight: 8 },
-
   examCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: SURFACE_VARIANT },
   examHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   examTypeBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
@@ -668,14 +625,12 @@ const styles = StyleSheet.create({
   subjectChipText: { fontSize: 12, color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
   showResultBtn: { backgroundColor: PRIMARY, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', padding: 12, borderRadius: 10, gap: 8 },
   showResultBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Poppins-SemiBold' },
-  
   badgeFinal: { backgroundColor: '#FAE2E2' },
   badgeSemester: { backgroundColor: '#E0EFFF' },
   badgeUnit: { backgroundColor: '#E3F6E3' },
   textFinal: { color: '#BA1A1A' },
   textSemester: { color: '#0061A4' },
   textUnit: { color: '#146C2E' },
-
   resultItem: { backgroundColor: '#fff', borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: SURFACE_VARIANT, overflow: 'hidden' },
   resultMainRow: { flexDirection: 'row', padding: 16, justifyContent: 'space-between', alignItems: 'flex-start' },
   resultLeft: { flexDirection: 'row', flex: 1, alignItems: 'flex-start' },
@@ -683,10 +638,16 @@ const styles = StyleSheet.create({
   studentAvatarText: { color: PRIMARY, fontSize: 16, fontFamily: 'Poppins-SemiBold' },
   studentName: { fontSize: 14, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
   marksText: { fontSize: 13, color: '#49454F', marginTop: 4, fontFamily: 'Poppins-Regular' },
-  detailsList: { marginTop: 8, gap: 2 },
-  detailText: { fontSize: 12, color: '#49454F', fontFamily: 'Poppins-Regular' },
+  subjectBreakdownContainer: { paddingHorizontal: 16, paddingBottom: 12, gap: 6 },
+  subjectItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.5, borderColor: SURFACE_VARIANT },
+  subjectItemLeft: { flex: 1 },
+  detailText: { fontSize: 13, color: '#49454F', fontFamily: 'Poppins-Regular' },
+  highlightedSubjectText: { color: '#146C2E', fontFamily: 'Poppins-Medium' },
+  editableTag: { fontSize: 11, color: '#146C2E', fontFamily: 'Poppins-Regular', marginTop: 2 },
+  viewOnlyBadge: { backgroundColor: '#F5F5F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  viewOnlyText: { fontSize: 11, color: OUTLINE, fontFamily: 'Poppins-Medium' },
+  inlineEditIconBtn: { padding: 6, borderRadius: 16, backgroundColor: SURFACE_VARIANT },
   boldText: { fontFamily: 'Poppins-SemiBold' },
-  
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   statusPass: { backgroundColor: '#E3F6E3' },
   statusFail: { backgroundColor: '#FAE2E2' },
@@ -695,15 +656,11 @@ const styles = StyleSheet.create({
   statusPassText: { color: '#146C2E' },
   statusFailText: { color: '#BA1A1A' },
   statusNAText: { color: '#49454F' },
-
   inlineActionRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: SURFACE_VARIANT, backgroundColor: BG_LIGHT },
   inlineButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8 },
   inlineButtonText: { fontSize: 13, color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
-  inlineDivider: { width: 1, backgroundColor: SURFACE_VARIANT },
-  
   emptyBox: { alignItems: 'center', paddingVertical: 32 },
   emptyText: { color: OUTLINE, marginTop: 8, fontSize: 14, textAlign: 'center', fontFamily: 'Poppins-Regular' },
-
   dialogOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
   dialogCard: { backgroundColor: '#fff', borderRadius: 28, padding: 24, elevation: 6 },
   dialogTitle: { fontSize: 20, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
@@ -714,7 +671,6 @@ const styles = StyleSheet.create({
   dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16 },
   dialogBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
   dialogBtnText: { fontSize: 14, color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
-
   historyContainer: { minHeight: 300 },
   historyPadding: { paddingHorizontal: 4 },
   timelineItem: { flexDirection: 'row', minHeight: 56 },
@@ -724,4 +680,5 @@ const styles = StyleSheet.create({
   timelineBody: { flex: 1, paddingBottom: 16 },
   timelineTitle: { fontSize: 14, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
   timelineMeta: { fontSize: 12, color: '#49454F', marginTop: 2, fontFamily: 'Poppins-Regular' },
-}); 
+  noSubjectWarning: { color: '#BA1A1A', fontSize: 12, fontFamily: 'Poppins-Medium', marginTop: 6, fontStyle: 'italic' },
+});
