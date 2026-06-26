@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, Modal, Dimensions, StatusBar, RefreshControl, TextInput, ToastAndroid } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, Modal, Dimensions, StatusBar, RefreshControl, TextInput, ToastAndroid, Alert } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -8,7 +8,7 @@ import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-cont
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const PRIMARY = '#6750A4'; 
+const PRIMARY = '#6750A4';
 const SURFACE_VARIANT = '#E7E0EC';
 const OUTLINE = '#79747E';
 const BG_LIGHT = '#FEF7FF';
@@ -35,131 +35,91 @@ const SubjectChips = React.memo(({ subjects }) => (
   </View>
 ));
 
-// Individual subject row inside the student card
-const StudentSubjectRow = React.memo(({ detail, teacherSubjectNames, onEdit }) => {
-  const targetId = detail.subjectId; 
-
-  const isTeacherSubject = teacherSubjectNames.some(
-    name => name?.trim().toLowerCase() === detail.subjectName?.trim().toLowerCase()
-  );
-
-  return (
-    <View style={styles.subjectItemRow}>
-      <View style={styles.subjectItemLeft}>
-        <Text style={[styles.detailText, isTeacherSubject && styles.highlightedSubjectText]}>
-          {detail.subjectName}: <Text style={styles.boldText}>{detail.obtainedMarks}</Text>/{detail.maxMarks}
-        </Text>
-        {isTeacherSubject && <Text style={styles.editableTag}>Assigned to you</Text>}
-      </View>
-      
-      {isTeacherSubject ? (
-        <Pressable 
-          android_ripple={CIRCLE_RIPPLE} 
-          style={styles.inlineEditIconBtn}
-          onPress={() => onEdit(targetId, detail.subjectName, detail.maxMarks, detail.obtainedMarks)}
-        >
-          <MatIcon name="pencil" size={16} color={PRIMARY} />
-        </Pressable>
-      ) : (
-        <View style={styles.viewOnlyBadge}>
-          <Text style={styles.viewOnlyText}>View Only</Text>
-        </View>
-      )}
+const StudentSubjectRow = React.memo(({ detail, onEdit }) => (
+  <View style={[styles.subjectItemRow, detail.isNewRecord && styles.fallbackHighlightRow]}>
+    <View style={styles.subjectItemLeft}>
+      <Text style={styles.detailText}>
+        {detail.subjectName}: <Text style={styles.boldText}>{detail.isNewRecord ? 'Not Assigned' : detail.obtainedMarks}</Text>/{detail.maxMarks}
+      </Text>
     </View>
-  );
-});
+    <Pressable
+      android_ripple={CIRCLE_RIPPLE}
+      style={[styles.inlineEditIconBtn, detail.isNewRecord && { backgroundColor: '#E8F5E9' }]}
+      onPress={() => onEdit(detail.subjectId || detail.id, detail.subjectName, detail.maxMarks, detail.obtainedMarks, detail.isNewRecord)}
+    >
+      <MatIcon
+        name={detail.isNewRecord ? 'plus-circle' : 'pencil'}
+        size={detail.isNewRecord ? 18 : 16}
+        color={detail.isNewRecord ? '#146C2E' : PRIMARY}
+      />
+    </Pressable>
+  </View>
+));
 
-const ClassItemRow = React.memo(({ item, onFetchExams, userEmail }) => {
-  const mapping = item.teacherSubjectMappings?.find(t => t.teacherEmail === userEmail);
-  const teacherSubjectNames = mapping?.subjects ?? [];
-
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.standardCircle}>
-          <Text style={styles.standardText}>{item.standard}</Text>
-        </View>
-        <View style={styles.headerText}>
-          <Text style={styles.mainTitle}>Division {item.division} • {item.medium}</Text>
-          <View style={styles.timeRow}>
-            <MatIcon name="clock-outline" size={14} color={OUTLINE} />
-            <Text style={styles.subTitle}>{item.startTime} - {item.endTime}</Text>
-          </View>
-        </View>
-        <View style={styles.yearBadge}>
-          <Text style={styles.yearText}>{item.year}</Text>
+const ClassItemRow = React.memo(({ item, onFetchExams }) => (
+  <View style={styles.card}>
+    <View style={styles.cardHeader}>
+      <View style={styles.standardCircle}>
+        <Text style={styles.standardText}>{item.standard}</Text>
+      </View>
+      <View style={styles.headerText}>
+        <Text style={styles.mainTitle}>Division {item.division} • {item.medium}</Text>
+        <View style={styles.timeRow}>
+          <MatIcon name="clock-outline" size={14} color={OUTLINE} />
+          <Text style={styles.subTitle}>{item.startTime} - {item.endTime}</Text>
         </View>
       </View>
-
-      <Pressable 
-        android_ripple={SOLID_RIPPLE}
-        style={styles.outlineActionButton} 
-        onPress={() => onFetchExams(item.id, `${item.standard} - ${item.division}`, teacherSubjectNames)}
-      >
-        <Text style={styles.outlineButtonText}>View Performance & Exams</Text>
-        <MatIcon name="arrow-right" size={18} color={PRIMARY} />
-      </Pressable>
+      <View style={styles.yearBadge}>
+        <Text style={styles.yearText}>{item.year}</Text>
+      </View>
     </View>
-  );
-});
 
-const ExamItemRow = React.memo(({ item, onFetchResults }) => {
-  const badgeStyle = getExamBadgeStyles(item.examType);
+    <Pressable
+      android_ripple={SOLID_RIPPLE}
+      style={styles.outlineActionButton}
+      onPress={() => onFetchExams(item.id, `${item.standard} - ${item.division}`)}
+    >
+      <Text style={styles.outlineButtonText}>View Performance & Exams</Text>
+      <MatIcon name="arrow-right" size={18} color={PRIMARY} />
+    </Pressable>
+  </View>
+));
 
-  return (
-    <View style={styles.examCard}>
-      <View style={styles.examHeader}>
-        <View style={[styles.examTypeBadge, badgeStyle.badge]}>
-          <Text style={[styles.examTypeText, badgeStyle.text]}>{item.examType || 'Exam'}</Text>
-        </View>
-        <View style={styles.flexTextContainer}>
-          <Text style={styles.examName}>{item.examName}</Text>
-          <View style={styles.examDateRow}>
-            <MatIcon name="calendar-clock" size={12} color={OUTLINE} />
-            <Text style={styles.examDate}>{item.examDate || 'No date scheduled'}</Text>
-          </View>
+const ExamItemRow = React.memo(({ item, onFetchResults }) => (
+  <View style={styles.examCard}>
+    <View style={styles.examHeader}>
+      <View style={[styles.examTypeBadge, getExamBadgeStyles(item.examType).badge]}>
+        <Text style={[styles.examTypeText, getExamBadgeStyles(item.examType).text]}>{item.examType || 'Exam'}</Text>
+      </View>
+      <View style={styles.flexTextContainer}>
+        <Text style={styles.examName}>{item.examName}</Text>
+        <View style={styles.examDateRow}>
+          <MatIcon name="calendar-clock" size={12} color={OUTLINE} />
+          <Text style={styles.examDate}>{item.examDate || 'No date scheduled'}</Text>
         </View>
       </View>
-
-      <SubjectChips subjects={item.subjects || []} />
-
-      <Pressable
-        android_ripple={SOLID_RIPPLE}
-        style={styles.showResultBtn}
-        onPress={() => onFetchResults(item.id, item.examName, item.subjects || [])}
-      >
-        <MatIcon name="chart-bar" size={16} color="#fff" />
-        <Text style={styles.showResultBtnText}>Open Grade Roster</Text>
-      </Pressable>
     </View>
-  );
-});
 
-const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHistory, teacherSubjectNames, activeExamSubjects }) => {
-  const notAttempted = item.overAllStatus === 'Not Attempted';
+    <SubjectChips subjects={item.subjects || []} />
+
+    <Pressable
+      android_ripple={SOLID_RIPPLE}
+      style={styles.showResultBtn}
+      onPress={() => onFetchResults(item.id, item.examName)}
+    >
+      <MatIcon name="chart-bar" size={16} color="#fff" />
+      <Text style={styles.showResultBtnText}>Open Grade Roster</Text>
+    </Pressable>
+  </View>
+));
+
+const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHistory }) => {
+  const notAttempted = item.overAllStatus === 'Not Attempted' || !item.details || item.details.length === 0;
   const passed = item.overAllStatus === 'Pass';
 
-  const handleSubjectEditPress = (subId, subName, maxM, currM) => {
-    onOpenSingleSubjectAssign(item, subId, subName, maxM, currM);
+  const handleSubjectEditPress = (subId, subName, maxM, currM, isNewRecord) => {
+    onOpenSingleSubjectAssign(item, subId, subName, maxM, currM, isNewRecord);
   };
-
-  const teacherSubjectExistsInDetails = item.details?.some(detail => 
-    teacherSubjectNames.some(name => name?.trim().toLowerCase() === detail.subjectName?.trim().toLowerCase())
-  );
-
-  let fallbackSubjectConfig = null;
-  if (!teacherSubjectExistsInDetails) {
-    const matchedExamSubject = activeExamSubjects.find(sub => 
-      teacherSubjectNames.some(name => name?.trim().toLowerCase() === sub.subjectName?.trim().toLowerCase())
-    );
-    if (matchedExamSubject) {
-      fallbackSubjectConfig = {
-        subjectId: matchedExamSubject.id,
-        subjectName: matchedExamSubject.subjectName,
-        maxMarks: matchedExamSubject.maxMarks || 100
-      };
-    }
-  }
 
   return (
     <View style={styles.resultItem}>
@@ -167,11 +127,11 @@ const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHisto
         <View style={styles.resultLeft}>
           <View style={styles.studentAvatar}>
             <Text style={styles.studentAvatarText}>
-              {item.studentName?.charAt(0).toUpperCase()}
+              {item.studentName?.trim().charAt(0).toUpperCase()}
             </Text>
           </View>
           <View style={styles.flexTextContainer}>
-            <Text style={styles.studentName}>{item.studentName}</Text>
+            <Text style={styles.studentName}>{item.studentName?.trim()}</Text>
             {!notAttempted && (
               <Text style={styles.marksText}>
                 Aggregated Score: <Text style={styles.boldText}>{item.totalObtained}/{item.totalMax}</Text> ({item.percentage}%)
@@ -194,43 +154,22 @@ const ResultItemRow = React.memo(({ item, onOpenSingleSubjectAssign, onOpenHisto
       </View>
 
       <View style={styles.subjectBreakdownContainer}>
-        {item.details && item.details.length > 0 && (
+        {item.details && item.details.length > 0 ? (
           item.details.map((detail, idx) => (
-            <StudentSubjectRow 
-              key={idx} 
-              detail={detail} 
-              teacherSubjectNames={teacherSubjectNames} 
-              onEdit={handleSubjectEditPress} 
+            <StudentSubjectRow
+              key={idx}
+              detail={detail}
+              onEdit={handleSubjectEditPress}
             />
           ))
-        )}
-
-        {fallbackSubjectConfig && (
-          <View style={[styles.subjectItemRow, styles.fallbackHighlightRow]}>
-            <View style={styles.subjectItemLeft}>
-              <Text style={[styles.detailText, styles.highlightedSubjectText]}>
-                {fallbackSubjectConfig.subjectName}: <Text style={styles.boldText}>Not Allotted</Text>/{fallbackSubjectConfig.maxMarks}
-              </Text>
-              <Text style={styles.editableTag}>Assigned to you</Text>
-            </View>
-            <Pressable 
-              android_ripple={CIRCLE_RIPPLE} 
-              style={[styles.inlineEditIconBtn, { backgroundColor: '#E8F5E9' }]}
-              onPress={() => handleSubjectEditPress(fallbackSubjectConfig.subjectId, fallbackSubjectConfig.subjectName, fallbackSubjectConfig.maxMarks, '')}
-            >
-              <MatIcon name="plus-circle" size={18} color="#146C2E" />
-            </Pressable>
-          </View>
-        )}
-
-        {(!item.details || item.details.length === 0) && !fallbackSubjectConfig && (
+        ) : (
           <Text style={styles.noSubjectWarning}>No marks records populated for this student.</Text>
         )}
       </View>
 
       <View style={styles.inlineActionRow}>
-        <Pressable 
-          android_ripple={SOLID_RIPPLE} 
+        <Pressable
+          android_ripple={SOLID_RIPPLE}
           style={styles.inlineButton}
           onPress={() => onOpenHistory(item)}
         >
@@ -258,13 +197,14 @@ const TeacherResultContent = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
-  const [teacherSubjectNames, setTeacherSubjectNames] = useState([]);
-  const [activeExamSubjects, setActiveExamSubjects] = useState([]); 
+  const [currentExamSubjectsStructure, setCurrentExamSubjectsStructure] = useState([]);
+
+  const selectedClassIdRef = useRef(null);
+  const currentExamSubjectsRef = useRef([]);
 
   const [isExamsModalVisible, setIsExamsModalVisible] = useState(false);
   const [exams, setExams] = useState([]);
   const [examsLoading, setExamsLoading] = useState(false);
-  const [selectedClassId, setSelectedClassId] = useState(null);
   const [selectedClassName, setSelectedClassName] = useState('');
 
   const [isResultsModalVisible, setIsResultsModalVisible] = useState(false);
@@ -275,7 +215,7 @@ const TeacherResultContent = () => {
 
   const [isAssignModalVisible, setIsAssignModalVisible] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-  const [targetSubjectConfig, setTargetSubjectConfig] = useState({ id: null, name: '', maxMarks: 0 });
+  const [targetSubjectConfig, setTargetSubjectConfig] = useState({ id: null, name: '', maxMarks: 0, isNewRecord: false });
   const [singleMarksInput, setSingleMarksInput] = useState('');
   const [assignLoading, setAssignLoading] = useState(false);
 
@@ -294,7 +234,7 @@ const TeacherResultContent = () => {
     } catch (err) {
       setError('Failed to load assigned classrooms.');
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
       setRefreshing(false);
     }
   }, [user?.id, user?.email]);
@@ -303,13 +243,12 @@ const TeacherResultContent = () => {
     fetchClassrooms(false);
   }, [fetchClassrooms]);
 
-  const fetchExams = useCallback(async (classId, className, namesList) => {
+  const fetchExams = useCallback(async (classId, className) => {
     setIsExamsModalVisible(true);
     setExamsLoading(true);
     setExams([]);
-    setSelectedClassId(classId);
+    selectedClassIdRef.current = classId;
     setSelectedClassName(className);
-    setTeacherSubjectNames(namesList);
     try {
       if (!user?.email) return;
       const data = await teacherApi.getExamByClassId(user.email, classId);
@@ -321,60 +260,110 @@ const TeacherResultContent = () => {
     }
   }, [user?.email]);
 
-  const fetchResults = useCallback(async (examId, examName, subjectsList = []) => {
+  const fetchResults = useCallback(async (examId, examName) => {
     setIsResultsModalVisible(true);
     setResultsLoading(true);
     setResults([]);
     setSelectedExamId(examId);
     setSelectedExamName(examName);
-    
-    if (subjectsList && subjectsList.length > 0) {
-      setActiveExamSubjects(subjectsList);
-    }
+
     try {
-      if (!user?.email || !selectedClassId) return;
-      const data = await teacherApi.getResultByClassroom(user.email, selectedClassId, examId);
-      setResults(data);
+      if (!user?.email || !selectedClassIdRef.current) return;
+
+      const examSubjects = await teacherApi.getSubjectbyExamId(user.email, examId);
+      const activeStructure = Array.isArray(examSubjects) ? examSubjects : [];
+      
+      setCurrentExamSubjectsStructure(activeStructure);
+      currentExamSubjectsRef.current = activeStructure;
+
+      const data = await teacherApi.getResultByClassroom(user.email, selectedClassIdRef.current, examId);
+
+      const dynamicRoster = Array.isArray(data) ? data.map(student => {
+        let studentDetails = student.details ? [...student.details] : [];
+
+        activeStructure.forEach(examSub => {
+          const subjectExists = studentDetails.some(
+            d => Number(d.subjectId) === Number(examSub.id)
+          );
+          if (!subjectExists) {
+            studentDetails.push({
+              subjectId: examSub.id,
+              subjectName: examSub.subjectName,
+              obtainedMarks: '',
+              maxMarks: examSub.maxMarks || 100,
+              isNewRecord: true,
+            });
+          }
+        });
+
+        return { ...student, details: studentDetails };
+      }) : [];
+
+      setResults(dynamicRoster);
+
     } catch (err) {
-      ToastAndroid.show('Failed to sync current roster marks.', ToastAndroid.SHORT);
+      ToastAndroid.show('Failed to sync current roster configurations.', ToastAndroid.SHORT);
     } finally {
       setResultsLoading(false);
     }
-  }, [user?.email, selectedClassId]);
+  }, [user?.email]);
 
-  const openSingleSubjectAssign = useCallback((student, subjectId, subjectName, maxMarks, currentMarks) => {
+  const openSingleSubjectAssign = useCallback((student, subjectId, subjectName, maxMarks, currentMarks, isNewRecord) => {
     setSelectedStudent(student);
-    setTargetSubjectConfig({ id: subjectId, name: subjectName, maxMarks });
+    setTargetSubjectConfig({ id: subjectId, name: subjectName, maxMarks, isNewRecord: isNewRecord ?? false });
     setSingleMarksInput(currentMarks?.toString() || '');
     setIsAssignModalVisible(true);
   }, []);
 
   const submitSingleSubjectMarks = async () => {
-    const obtainedMarks = Number(singleMarksInput || 0);
+  const validSubjectId = targetSubjectConfig.id;
+  if (!validSubjectId && validSubjectId !== 0) {
+    Alert.alert('Error', 'Subject ID mapping parameter missing.');
+    return;
+  }
 
-    try {
-      setAssignLoading(true);
-      const payload = {
-        studentId: selectedStudent.studentId,
-        examId: selectedExamId,
-        subjectId: targetSubjectConfig.id,
-        obtainedMarks: obtainedMarks,
-      };
+  const validStudentId = selectedStudent?.studentId || selectedStudent?.id;
+  if (!validStudentId) {
+    Alert.alert('Error', 'Student data reference missing.');
+    return;
+  }
 
-      await teacherApi.submitMarkByTeacher(user.email, payload);
-      ToastAndroid.show('Marks successfully updated!', ToastAndroid.SHORT);
-      setIsAssignModalVisible(false);
-      
-      await fetchResults(selectedExamId, selectedExamName);
-    } catch (err) {
-      ToastAndroid.show(err.message || 'Failed to submit marks', ToastAndroid.LONG);
-    } finally {
-      setAssignLoading(false);
-    }
-  };
+  if (singleMarksInput === '') {
+    Alert.alert('Validation', 'Please enter obtained marks.');
+    return;
+  }
+
+  const obtainedMarks = Number(singleMarksInput);
+
+  if (obtainedMarks > targetSubjectConfig.maxMarks) {
+    Alert.alert('Validation', `Marks cannot exceed maximum of ${targetSubjectConfig.maxMarks}.`);
+    return;
+  }
+
+  try {
+    setAssignLoading(true);
+
+    await teacherApi.submitMarkByTeacher(user.email, {
+      studentId: validStudentId,
+      examId: selectedExamId,
+      subjectId: validSubjectId,
+      obtainedMarks: obtainedMarks,
+    });
+
+    ToastAndroid.show('Marks successfully saved!', ToastAndroid.SHORT);
+    setIsAssignModalVisible(false);
+
+    await fetchResults(selectedExamId, selectedExamName);
+  } catch (err) {
+    Alert.alert('Failed to Submit', err.message || 'An unexpected error occurred.');
+  } finally {
+    setAssignLoading(false);
+  }
+};
 
   const openStudentHistory = useCallback(async (student) => {
-    if (!student?.studentId) {
+    const validStudentId = student?.studentId || student?.id;
+    if (!validStudentId) {
       ToastAndroid.show('Invalid student selection identifier.', ToastAndroid.SHORT);
       return;
     }
@@ -384,7 +373,7 @@ const TeacherResultContent = () => {
     setHistoryRecords([]);
     try {
       if (!user?.email) return;
-      const responseData = await teacherApi.getResultByStudentAndAcademicYear(user.email, student.studentId);
+      const responseData = await teacherApi.getResultByStudentAndAcademicYear(user.email, validStudentId);
       if (Array.isArray(responseData)) {
         const formattedRecords = responseData.map(record => ({
           exam: record.examName || 'Assessment Block',
@@ -402,22 +391,20 @@ const TeacherResultContent = () => {
   }, [user?.email]);
 
   const dynamicClassRenderer = useCallback(({ item }) => (
-    <ClassItemRow item={item} onFetchExams={fetchExams} userEmail={user?.email} />
-  ), [fetchExams, user?.email]);
+    <ClassItemRow item={item} onFetchExams={fetchExams} />
+  ), [fetchExams]);
 
   const dynamicExamRenderer = useCallback(({ item }) => (
     <ExamItemRow item={item} onFetchResults={fetchResults} />
   ), [fetchResults]);
 
   const dynamicResultRenderer = useCallback(({ item }) => (
-    <ResultItemRow 
-      item={item} 
-      onOpenSingleSubjectAssign={openSingleSubjectAssign} 
-      onOpenHistory={openStudentHistory} 
-      teacherSubjectNames={teacherSubjectNames} 
-      activeExamSubjects={activeExamSubjects}
+    <ResultItemRow
+      item={item}
+      onOpenSingleSubjectAssign={openSingleSubjectAssign}
+      onOpenHistory={openStudentHistory}
     />
-  ), [openSingleSubjectAssign, openStudentHistory, teacherSubjectNames, activeExamSubjects]);
+  ), [openSingleSubjectAssign, openStudentHistory]);
 
   if (error) {
     return (
@@ -435,7 +422,7 @@ const TeacherResultContent = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
-      
+
       <View style={[styles.appbar, { paddingTop: Math.max(12, insets.top) }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} android_ripple={CIRCLE_RIPPLE}>
           <MatIcon name="arrow-left" size={24} color={PRIMARY} />
@@ -520,7 +507,7 @@ const TeacherResultContent = () => {
               <FlatList
                 data={results}
                 renderItem={dynamicResultRenderer}
-                keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+                keyExtractor={(item, index) => (item.studentId || item.id || index).toString()}
                 contentContainerStyle={styles.bottomListPadding}
                 ListEmptyComponent={
                   <View style={styles.emptyBox}>
@@ -538,19 +525,22 @@ const TeacherResultContent = () => {
       <Modal animationType="fade" transparent={true} visible={isAssignModalVisible} onRequestClose={() => setIsAssignModalVisible(false)}>
         <View style={styles.dialogOverlay}>
           <View style={styles.dialogCard}>
-            <Text style={styles.dialogTitle}>Update Subject Marks</Text>
-            <Text style={styles.dialogSub}>{selectedStudent?.studentName}</Text>
+            <Text style={styles.dialogTitle}>{targetSubjectConfig.isNewRecord ? 'Assign Marks' : 'Update Marks'}</Text>
+            <Text style={styles.dialogSub}>{selectedStudent?.studentName?.trim()}</Text>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>{targetSubjectConfig.name}</Text>
+              <Text style={styles.inputLabel}>Subject: {targetSubjectConfig.name} (Max: {targetSubjectConfig.maxMarks})</Text>
               <TextInput
                 style={styles.textInputAndroid}
-                keyboardType="numeric"
-                placeholder="Enter new obtained mark"
+                keyboardType="decimal-pad"
+                placeholder="Obtained Marks"
                 value={singleMarksInput}
                 onChangeText={(text) => {
-                  const numericValue = text.replace(/[^0-9]/g, '');
-                  setSingleMarksInput(numericValue);
+                  let formatted = text.replace(/[^0-9.]/g, '');
+                  const parts = formatted.split('.');
+                  if (parts.length > 2) formatted = parts[0] + '.' + parts.slice(1).join('');
+                  if (parts[1] && parts[1].length > 2) formatted = parts[0] + '.' + parts[1].slice(0, 2);
+                  setSingleMarksInput(formatted);
                 }}
               />
             </View>
@@ -560,7 +550,10 @@ const TeacherResultContent = () => {
                 <Text style={[styles.dialogBtnText, { color: OUTLINE }]}>Cancel</Text>
               </Pressable>
               <Pressable style={styles.dialogBtn} android_ripple={SOLID_RIPPLE} onPress={submitSingleSubjectMarks} disabled={assignLoading}>
-                {assignLoading ? <ActivityIndicator size="small" color={PRIMARY} /> : <Text style={styles.dialogBtnText}>Save</Text>}
+                {assignLoading
+                  ? <ActivityIndicator size="small" color={PRIMARY} />
+                  : <Text style={styles.dialogBtnText}>{targetSubjectConfig.isNewRecord ? 'Assign' : 'Update'}</Text>
+                }
               </Pressable>
             </View>
           </View>
@@ -575,7 +568,7 @@ const TeacherResultContent = () => {
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Performance History Tracker</Text>
-                <Text style={styles.modalSub}>{selectedStudent?.studentName}</Text>
+                <Text style={styles.modalSub}>{selectedStudent?.studentName?.trim()}</Text>
               </View>
               <Pressable android_ripple={CIRCLE_RIPPLE} onPress={() => setIsHistoryModalVisible(false)}>
                 <MatIcon name="close" size={24} color={OUTLINE} />
@@ -607,14 +600,6 @@ const TeacherResultContent = () => {
     </View>
   );
 };
-
-export default function TeacherResult() {
-  return (
-    <SafeAreaProvider>
-      <TeacherResultContent />
-    </SafeAreaProvider>
-  );
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG_LIGHT },
@@ -674,48 +659,52 @@ const styles = StyleSheet.create({
   studentAvatarText: { color: PRIMARY, fontSize: 16, fontFamily: 'Poppins-SemiBold' },
   studentName: { fontSize: 14, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
   marksText: { fontSize: 13, color: '#49454F', marginTop: 4, fontFamily: 'Poppins-Regular' },
-  subjectBreakdownContainer: { paddingHorizontal: 16, paddingBottom: 12, gap: 6 },
-  subjectItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 0.5, borderColor: SURFACE_VARIANT },
-  fallbackHighlightRow: { borderBottomWidth: 1, borderStyle: 'dashed', borderColor: '#A5D6A7', paddingVertical: 10 },
+  boldText: { fontFamily: 'Poppins-SemiBold' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusNA: { backgroundColor: '#F5F5F5' },
+  statusPass: { backgroundColor: '#E8F5E9' },
+  statusFail: { backgroundColor: '#FFEBEE' },
+  statusText: { fontSize: 12, fontFamily: 'Poppins-SemiBold' },
+  statusNAText: { color: '#757575' },
+  statusPassText: { color: '#2E7D32' },
+  statusFailText: { color: '#C62828' },
+  subjectBreakdownContainer: { backgroundColor: '#FAFAFA', padding: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: SURFACE_VARIANT },
+  subjectItemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  fallbackHighlightRow: { backgroundColor: '#F8F9FA', paddingHorizontal: 4 },
   subjectItemLeft: { flex: 1 },
   detailText: { fontSize: 13, color: '#49454F', fontFamily: 'Poppins-Regular' },
-  highlightedSubjectText: { color: '#146C2E', fontFamily: 'Poppins-Medium' },
-  editableTag: { fontSize: 11, color: '#146C2E', fontFamily: 'Poppins-Regular', marginTop: 2 },
-  viewOnlyBadge: { backgroundColor: '#F5F5F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  viewOnlyText: { fontSize: 11, color: OUTLINE, fontFamily: 'Poppins-Medium' },
-  inlineEditIconBtn: { padding: 6, borderRadius: 16, backgroundColor: SURFACE_VARIANT },
-  boldText: { fontFamily: 'Poppins-SemiBold' },
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusPass: { backgroundColor: '#E3F6E3' },
-  statusFail: { backgroundColor: '#FAE2E2' },
-  statusNA: { backgroundColor: SURFACE_VARIANT },
-  statusText: { fontSize: 11, fontFamily: 'Poppins-SemiBold' },
-  statusPassText: { color: '#146C2E' },
-  statusFailText: { color: '#BA1A1A' },
-  statusNAText: { color: '#49454F' },
-  inlineActionRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: SURFACE_VARIANT, backgroundColor: BG_LIGHT },
-  inlineButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, gap: 8 },
-  inlineButtonText: { fontSize: 13, color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
-  emptyBox: { alignItems: 'center', paddingVertical: 32 },
-  emptyText: { color: OUTLINE, marginTop: 8, fontSize: 14, textAlign: 'center', fontFamily: 'Poppins-Regular' },
-  dialogOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
-  dialogCard: { backgroundColor: '#fff', borderRadius: 28, padding: 24, elevation: 6 },
-  dialogTitle: { fontSize: 20, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
-  dialogSub: { fontSize: 14, color: '#49454F', marginBottom: 16, marginTop: 4, fontFamily: 'Poppins-Regular' },
-  inputGroup: { marginBottom: 12 },
-  inputLabel: { fontSize: 12, color: PRIMARY, marginBottom: 4, fontFamily: 'Poppins-SemiBold' },
-  textInputAndroid: { borderWidth: 1, borderColor: OUTLINE, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 14, color: '#1C1B1F', fontFamily: 'Poppins-Regular' },
-  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 16 },
-  dialogBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20 },
-  dialogBtnText: { fontSize: 14, color: PRIMARY, fontFamily: 'Poppins-SemiBold' },
+  inlineEditIconBtn: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F5F5F5' },
+  noSubjectWarning: { fontSize: 12, color: '#BA1A1A', textAlign: 'center', paddingVertical: 4, fontFamily: 'Poppins-Regular' },
+  inlineActionRow: { padding: 8, backgroundColor: '#FFF' },
+  inlineButton: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 },
+  inlineButtonText: { fontSize: 13, color: PRIMARY, fontFamily: 'Poppins-Medium' },
+  emptyBox: { padding: 32, alignItems: 'center' },
+  emptyText: { fontSize: 13, color: OUTLINE, marginTop: 8, textAlign: 'center', fontFamily: 'Poppins-Regular' },
+  dialogOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  dialogCard: { backgroundColor: '#fff', borderRadius: 28, padding: 24, width: '100%', maxWidth: 320 },
+  dialogTitle: { fontSize: 24, color: '#1C1B1F', fontFamily: 'Poppins-Regular' },
+  dialogSub: { fontSize: 14, color: '#49454F', marginTop: 4, fontFamily: 'Poppins-Regular' },
+  inputGroup: { marginTop: 24 },
+  inputLabel: { fontSize: 12, color: PRIMARY, fontFamily: 'Poppins-Medium' },
+  textInputAndroid: { borderBottomWidth: 1, borderColor: PRIMARY, paddingVertical: 4, fontSize: 16, color: '#1C1B1F', marginTop: 4 },
+  dialogActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 24 },
+  dialogBtn: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
+  dialogBtnText: { fontSize: 14, color: PRIMARY, fontFamily: 'Poppins-Medium' },
   historyContainer: { minHeight: 300 },
-  historyPadding: { paddingHorizontal: 4 },
-  timelineItem: { flexDirection: 'row', minHeight: 56 },
-  timelineLeftColumn: { alignItems: 'center', marginRight: 16, width: 16 },
-  timelineNode: { width: 12, height: 12, borderRadius: 6, backgroundColor: PRIMARY, marginTop: 6 },
-  timelineLine: { width: 2, flex: 1, backgroundColor: SURFACE_VARIANT, marginVertical: 2 },
-  timelineBody: { flex: 1, paddingBottom: 16 },
-  timelineTitle: { fontSize: 14, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
+  historyPadding: { marginTop: 16 },
+  timelineItem: { flexDirection: 'row', minHeight: 60 },
+  timelineLeftColumn: { alignItems: 'center', marginRight: 12 },
+  timelineNode: { width: 12, height: 12, borderRadius: 6, backgroundColor: PRIMARY },
+  timelineLine: { flex: 1, width: 2, backgroundColor: SURFACE_VARIANT, marginTop: 4, marginBottom: 4 },
+  timelineBody: { flex: 1, paddingTop: 0 },
+  timelineTitle: { fontSize: 14, color: '#1C1B1F', fontFamily: 'Poppins-Medium' },
   timelineMeta: { fontSize: 12, color: '#49454F', marginTop: 2, fontFamily: 'Poppins-Regular' },
-  noSubjectWarning: { color: '#BA1A1A', fontSize: 12, fontFamily: 'Poppins-Medium', marginTop: 6, fontStyle: 'italic' },
 });
+
+export default function TeacherResult() {
+  return (
+    <SafeAreaProvider>
+      <TeacherResultContent />
+    </SafeAreaProvider>
+  );
+}
