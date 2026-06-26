@@ -354,19 +354,80 @@ export const teacherApi = {
     }
   },
 
-  // submitMarkByTeacher
-  submitMarkByTeacher: async (email, payload) => {
+  // Get subjects by exam
+  // API: GET /getSubjectbyExamId?examId=18&role=teacher&email=...
+  getSubjectbyExamId: async (email, examId) => {
     try {
-      const response = await api.post('/submitMarkByTeacher', payload, {
+      const response = await api.get('/getSubjectbyExamId', {
         params: {
           role: 'teacher',
-          email: email,
+          email,
+          examId,
         },
       });
+
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || error.message || 'Failed to submit Marks.';
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch subjects.';
+
+      console.error(`[TeacherApi] getSubjectbyExamId failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
+  // Submit marks (New)
+  // API: POST /submitMarkByTeacher
+  submitMarkByTeacher: async (email, payload) => {
+    try {
+      const response = await api.post(
+        '/submitMarkByTeacher',
+        payload,
+        {
+          params: {
+            role: 'teacher',
+            email,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to submit marks.';
+
       console.error(`[TeacherApi] submitMarkByTeacher failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
+  // Update existing marks
+  // API: PUT /updateSubjectMarks/{subjectId}
+  updateSubjectMarks: async (subjectId, email, payload) => {
+    try {
+      const response = await api.put(
+        `/updateSubjectMarks/${subjectId}`,
+        payload,
+        {
+          params: {
+            role: 'teacher',
+            email,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to update marks.';
+
+      console.error(`[TeacherApi] updateSubjectMarks failed: ${message}`);
       throw new Error(message);
     }
   },
