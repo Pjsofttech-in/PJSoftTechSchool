@@ -461,7 +461,7 @@ export const TeacherAttendance = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f7ff' },
+  container: { flex: 1, backgroundColor: '#f8f9fe' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 14 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#edf2f7' },

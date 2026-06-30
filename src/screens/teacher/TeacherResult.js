@@ -11,7 +11,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRIMARY = '#6750A4';
 const SURFACE_VARIANT = '#E7E0EC';
 const OUTLINE = '#79747E';
-const BG_LIGHT = '#FEF7FF';
+const BG_LIGHT = '#f8f9fe';
 
 const SOLID_RIPPLE = { color: 'rgba(103, 80, 164, 0.12)', borderless: false };
 const CIRCLE_RIPPLE = { borderless: true, radius: 24 };

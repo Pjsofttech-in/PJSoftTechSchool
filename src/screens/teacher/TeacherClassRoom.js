@@ -462,7 +462,7 @@ export const TeacherClassRoom = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f5f9' },
+  container: { flex: 1, backgroundColor: '#f8f9fe' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 14 },
   card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 14, elevation: 1.5 },
