@@ -448,7 +448,7 @@ const handleClearFilters = () => {
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} android_ripple={CIRCLE_RIPPLE}>
           <MatIcon name="arrow-left" size={24} color={PRIMARY} />
         </Pressable>
-        <Text style={styles.appbartitle}>Performance Matrix</Text>
+        <Text style={styles.appbartitle}>Classroom Overview</Text>
       </View>
 
       <ClassroomFilterBar
@@ -490,7 +490,7 @@ const handleClearFilters = () => {
             <View style={styles.dragHandle} />
             <View style={styles.modalHeader}>
               <View>
-                <Text style={styles.modalTitle}>Available Assessment Cycles</Text>
+                <Text style={styles.modalTitle}>Classroom Exams</Text>
                 <Text style={styles.modalSub}>Batch: {selectedClassName}</Text>
               </View>
               <Pressable android_ripple={CIRCLE_RIPPLE} onPress={() => setIsExamsModalVisible(false)}>
