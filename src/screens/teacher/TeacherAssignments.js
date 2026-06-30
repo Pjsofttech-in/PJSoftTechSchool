@@ -168,7 +168,8 @@ export class TeacherAssignments extends Component {
     const { user } = useAuthStore.getState();
     this.setState({ submitAttempted: true });
 
-    if (!newTitle || !newDesc || (!selectedImage && !existingImageUrl)) {
+    // Validation Only Title, Description, and Due Date are mandatory Image is optional.
+    if (!newTitle || !newDesc || !newDate) {
       ToastAndroid.show('Please fix errors above', ToastAndroid.SHORT);
       return;
     }
@@ -176,9 +177,11 @@ export class TeacherAssignments extends Component {
     
     const formData = new FormData();
     const assignmentPayload = {
-      assignmentTitle: newTitle, description: newDesc,
+      assignmentTitle: newTitle, 
+      description: newDesc,
       dueDate: newDate.toISOString().split('T')[0],
-      branchCode: user.branchCode, role: 'teacher',
+      branchCode: user.branchCode, 
+      role: 'teacher',
       createdByEmail: user.email,
       teacher: { id: String(user.id) },
       classRoom: { id: selectedClassId },
@@ -349,7 +352,7 @@ export class TeacherAssignments extends Component {
             <KeyboardAvoidingView style={{ flex: 1 }}>
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20 }}>
                 
-                <Text style={styles.label}>Assignment Title</Text>
+                <Text style={styles.label}>Assignment Title *</Text>
                 <TextInput 
                   style={[
                     styles.input, 
@@ -365,7 +368,7 @@ export class TeacherAssignments extends Component {
                 />
                 {submitAttempted && !newTitle && <Text style={styles.inlineErrorText}>Title required</Text>}
                 
-                <Text style={styles.label}>Description</Text>
+                <Text style={styles.label}>Description *</Text>
                 <TextInput 
                   style={[
                     styles.input, 
@@ -383,16 +386,16 @@ export class TeacherAssignments extends Component {
                 />
                 {submitAttempted && !newDesc && <Text style={styles.inlineErrorText}>Description required</Text>}
                 
-                <Text style={styles.label}>Due Date</Text>
+                <Text style={styles.label}>Due Date *</Text>
                 <Pressable android_ripple={RIPPLE_CONFIG} style={styles.datePickerBtn} onPress={() => this.setState({ showDatePicker: true })}>
                   <MatIcon name="calendar-clock" size={20} color={PRIMARY} />
                   <Text style={styles.datePickerText} >{this.state.newDate.toDateString()}</Text>
                 </Pressable>
                 
-                <Text style={styles.label}>Attachment Reference</Text>
+                <Text style={styles.label}>Attachment Reference (Optional)</Text>
                 <Pressable 
                   android_ripple={RIPPLE_CONFIG}
-                  style={[styles.imagePickBtn, submitAttempted && !selectedImage && !existingImageUrl ? styles.errorInput : null]} 
+                  style={styles.imagePickBtn} 
                   onPress={this.handlePickImage}
                 >
                   {selectedImage || existingImageUrl ? (
@@ -409,7 +412,6 @@ export class TeacherAssignments extends Component {
                     </View>
                   )}
                 </Pressable>
-                {submitAttempted && !selectedImage && !existingImageUrl && <Text style={styles.inlineErrorText}>Attachment reference required</Text>}
                 
                 <Pressable android_ripple={WHITE_RIPPLE} style={styles.submitBtn} onPress={this.handlePostAssignment} disabled={this.state.uploading}>
                   {this.state.uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{editingAssignmentId ? 'Update Assignment' : 'Post Assignment'}</Text>}
