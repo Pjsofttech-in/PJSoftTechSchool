@@ -170,7 +170,7 @@ export class TeacherAssignments extends Component {
 
     // Validation Only Title, Description, and Due Date are mandatory Image is optional.
     if (!newTitle || !newDesc || !newDate) {
-      ToastAndroid.show('Please fix errors above', ToastAndroid.SHORT);
+      ToastAndroid.show('Please fill in all mandatory fields.', ToastAndroid.SHORT);
       return;
     }
     this.setState({ uploading: true });
