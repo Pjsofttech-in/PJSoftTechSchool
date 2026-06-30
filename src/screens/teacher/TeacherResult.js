@@ -5,6 +5,8 @@ import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
+import { ClassroomFilterBar } from '@components/ClassroomFilterBar';
+import { applyClassroomFilters } from '@utils/classroomFilterUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -202,6 +204,10 @@ const TeacherResultContent = () => {
   const selectedClassIdRef = useRef(null);
   const currentExamSubjectsRef = useRef([]);
 
+  const [allClassrooms, setAllClassrooms] = useState([]);
+  const [activeFilters, setActiveFilters] = useState({});
+  const [filterResetKey, setFilterResetKey] = useState(0);
+
   const [isExamsModalVisible, setIsExamsModalVisible] = useState(false);
   const [exams, setExams] = useState([]);
   const [examsLoading, setExamsLoading] = useState(false);
@@ -230,18 +236,33 @@ const TeacherResultContent = () => {
     try {
       if (!user?.id || !user?.email) return;
       const data = await teacherApi.getClassRooms(user.id, user.email);
-      setClassrooms(data);
+      
+      setAllClassrooms(data);
+      
+      const filtered = applyClassroomFilters(data, activeFilters);
+      setClassrooms(filtered);
     } catch (err) {
       setError('Failed to load assigned classrooms.');
     } finally {
-      loading && setLoading(false);
+      setLoading(false);
       setRefreshing(false);
     }
-  }, [user?.id, user?.email]);
+  }, [user?.id, user?.email, activeFilters]);
 
   useEffect(() => {
     fetchClassrooms(false);
   }, [fetchClassrooms]);
+
+  const handleFilterApply = (filters) => {
+  setActiveFilters(filters);
+  setClassrooms(applyClassroomFilters(allClassrooms, filters));
+};
+
+const handleClearFilters = () => {
+  setActiveFilters({});
+  setClassrooms(allClassrooms);
+  setFilterResetKey(prev => prev + 1);
+};
 
   const fetchExams = useCallback(async (classId, className) => {
     setIsExamsModalVisible(true);
@@ -430,6 +451,12 @@ const TeacherResultContent = () => {
         <Text style={styles.appbartitle}>Performance Matrix</Text>
       </View>
 
+      <ClassroomFilterBar
+       key={filterResetKey}
+       email={user?.email}
+       onApply={handleFilterApply}
+      />
+
       {loading && !refreshing ? (
         <View style={styles.centered}><ActivityIndicator size="large" color={PRIMARY} /></View>
       ) : (
@@ -446,7 +473,12 @@ const TeacherResultContent = () => {
             </View>
           }
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={fetchClassrooms} colors={SPINNER_COLORS} tintColor={PRIMARY} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchClassrooms(true)}
+            colors={SPINNER_COLORS}
+            tintColor={PRIMARY}
+            />
           }
         />
       )}
