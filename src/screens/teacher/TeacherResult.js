@@ -254,15 +254,15 @@ const TeacherResultContent = () => {
   }, [fetchClassrooms]);
 
   const handleFilterApply = (filters) => {
-  setActiveFilters(filters);
-  setClassrooms(applyClassroomFilters(allClassrooms, filters));
-};
+    setActiveFilters(filters);
+    setClassrooms(applyClassroomFilters(allClassrooms, filters));
+  };
 
-const handleClearFilters = () => {
-  setActiveFilters({});
-  setClassrooms(allClassrooms);
-  setFilterResetKey(prev => prev + 1);
-};
+  const handleClearFilters = () => {
+    setActiveFilters({});
+    setClassrooms(allClassrooms);
+    setFilterResetKey(prev => prev + 1);
+  };
 
   const fetchExams = useCallback(async (classId, className) => {
     setIsExamsModalVisible(true);
@@ -337,50 +337,50 @@ const handleClearFilters = () => {
   }, []);
 
   const submitSingleSubjectMarks = async () => {
-  const validSubjectId = targetSubjectConfig.id;
-  if (!validSubjectId && validSubjectId !== 0) {
-    Alert.alert('Error', 'Subject ID mapping parameter missing.');
-    return;
-  }
+    const validSubjectId = targetSubjectConfig.id;
+    if (!validSubjectId && validSubjectId !== 0) {
+      Alert.alert('Error', 'Subject ID mapping parameter missing.');
+      return;
+    }
 
-  const validStudentId = selectedStudent?.studentId || selectedStudent?.id;
-  if (!validStudentId) {
-    Alert.alert('Error', 'Student data reference missing.');
-    return;
-  }
+    const validStudentId = selectedStudent?.studentId || selectedStudent?.id;
+    if (!validStudentId) {
+      Alert.alert('Error', 'Student data reference missing.');
+      return;
+    }
 
-  if (singleMarksInput === '') {
-    Alert.alert('Validation', 'Please enter obtained marks.');
-    return;
-  }
+    if (singleMarksInput === '') {
+      Alert.alert('Validation', 'Please enter obtained marks.');
+      return;
+    }
 
-  const obtainedMarks = Number(singleMarksInput);
+    const obtainedMarks = Number(singleMarksInput);
 
-  if (obtainedMarks > targetSubjectConfig.maxMarks) {
-    Alert.alert('Validation', `Marks cannot exceed maximum of ${targetSubjectConfig.maxMarks}.`);
-    return;
-  }
+    if (obtainedMarks > targetSubjectConfig.maxMarks) {
+      Alert.alert('Validation', `Marks cannot exceed maximum of ${targetSubjectConfig.maxMarks}.`);
+      return;
+    }
 
-  try {
-    setAssignLoading(true);
+    try {
+      setAssignLoading(true);
 
-    await teacherApi.submitMarkByTeacher(user.email, {
-      studentId: validStudentId,
-      examId: selectedExamId,
-      subjectId: validSubjectId,
-      obtainedMarks: obtainedMarks,
-    });
+      await teacherApi.submitMarkByTeacher(user.email, {
+        studentId: validStudentId,
+        examId: selectedExamId,
+        subjectId: validSubjectId,
+        obtainedMarks: obtainedMarks,
+      });
 
-    ToastAndroid.show('Marks successfully saved!', ToastAndroid.SHORT);
-    setIsAssignModalVisible(false);
+      ToastAndroid.show('Marks successfully saved!', ToastAndroid.SHORT);
+      setIsAssignModalVisible(false);
 
-    await fetchResults(selectedExamId, selectedExamName);
-  } catch (err) {
-    Alert.alert('Failed to Submit', err.message || 'An unexpected error occurred.');
-  } finally {
-    setAssignLoading(false);
-  }
-};
+      await fetchResults(selectedExamId, selectedExamName);
+    } catch (err) {
+      Alert.alert('Failed to Submit', err.message || 'An unexpected error occurred.');
+    } finally {
+      setAssignLoading(false);
+    }
+  };
 
   const openStudentHistory = useCallback(async (student) => {
     const validStudentId = student?.studentId || student?.id;
@@ -452,9 +452,9 @@ const handleClearFilters = () => {
       </View>
 
       <ClassroomFilterBar
-       key={filterResetKey}
-       email={user?.email}
-       onApply={handleFilterApply}
+        key={filterResetKey}
+        email={user?.email}
+        onApply={handleFilterApply}
       />
 
       {loading && !refreshing ? (
@@ -473,11 +473,11 @@ const handleClearFilters = () => {
             </View>
           }
           refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => fetchClassrooms(true)}
-            colors={SPINNER_COLORS}
-            tintColor={PRIMARY}
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchClassrooms(true)}
+              colors={SPINNER_COLORS}
+              tintColor={PRIMARY}
             />
           }
         />
@@ -486,8 +486,7 @@ const handleClearFilters = () => {
       {/* Exams Modal */}
       <Modal animationType="slide" transparent={true} visible={isExamsModalVisible} onRequestClose={() => setIsExamsModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.85, paddingBottom: insets.bottom + 12 }]}>
-            <View style={styles.dragHandle} />
+          <View style={[styles.modalContent, { paddingTop: insets.top, paddingBottom: insets.bottom, }]}>
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>Classroom Exams</Text>
@@ -521,8 +520,7 @@ const handleClearFilters = () => {
       {/* Grade Roster Modal */}
       <Modal animationType="slide" transparent={true} visible={isResultsModalVisible} onRequestClose={() => setIsResultsModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: SCREEN_HEIGHT * 0.92, paddingBottom: insets.bottom + 12 }]}>
-            <View style={styles.dragHandle} />
+          <View style={[styles.modalContent, { paddingTop: insets.top, paddingBottom: insets.bottom, }]}>
             <View style={styles.modalHeader}>
               <View style={styles.headerTitleWrap}>
                 <Text style={styles.modalTitle} numberOfLines={1}>{selectedExamName}</Text>
@@ -656,8 +654,8 @@ const styles = StyleSheet.create({
   yearText: { fontSize: 11, color: '#49454F', fontFamily: 'Poppins-SemiBold' },
   outlineActionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, borderRadius: 10, gap: 8, borderWidth: 1, borderColor: PRIMARY },
   outlineButtonText: { color: PRIMARY, fontSize: 14, fontFamily: 'Poppins-SemiBold' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.32)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 24, paddingTop: 8 },
+  modalOverlay: { flex: 1, backgroundColor: '#fff', },
+  modalContent: { flex: 1, backgroundColor: '#fff', borderTopLeftRadius: 0, borderTopRightRadius: 0, paddingHorizontal: 16, paddingTop: 0 },
   dragHandle: { width: 32, height: 4, backgroundColor: OUTLINE, borderRadius: 2, alignSelf: 'center', marginBottom: 16, opacity: 0.4 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 },
   modalTitle: { fontSize: 18, color: '#1C1B1F', fontFamily: 'Poppins-SemiBold' },
