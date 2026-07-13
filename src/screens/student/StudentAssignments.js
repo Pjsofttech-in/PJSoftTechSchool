@@ -162,6 +162,22 @@ const AssignmentCard = ({item, onImagePress, onSubmitPress}) => {
   const daysInfo = getDaysInfo(item.dueDate);
   const isSubmitted = !!item.submitted;
 
+  // States for "Read More"
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [shouldShowToggle, setShouldShowToggle] = useState(false);
+
+  useEffect(() => {
+    setIsExpanded(false);
+    setShouldShowToggle(false);
+  }, [item.id]);
+
+  const handleTextLayout = useCallback(e => {
+    // capture the initial line count when not expanded
+    if (e.nativeEvent.lines.length > 1) {
+      setShouldShowToggle(true);
+    }
+  }, []);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardContent}>
@@ -193,10 +209,34 @@ const AssignmentCard = ({item, onImagePress, onSubmitPress}) => {
             {item.assignmentTitle}
           </Text>
           {item.description ? (
-            <Text style={styles.cardDesc} numberOfLines={2}>
-              {item.description}
-            </Text>
+            <View>
+              <Text
+              style={styles.cardDesc}
+              numberOfLines={isExpanded ? undefined : 2}
+              onTextLayout={!shouldShowToggle ? handleTextLayout : undefined}
+              >
+                {item.description}
+              </Text>
+
+              {shouldShowToggle && (
+                <TouchableOpacity 
+                  onPress={() => setIsExpanded(!isExpanded)}
+                  style={styles.readMoreBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.readMoreText}>
+                    {isExpanded ? 'Read Less' : 'Read More'}
+                  </Text>
+                  <MatIcon 
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                    size={14} 
+                    color={PRIMARY} 
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
           ) : null}
+
           <View style={styles.datesRow}>
             <View style={styles.dateItem}>
               <MatIcon name="calendar-plus" size={11} color={TEXT_LIGHT} />
@@ -561,6 +601,8 @@ const styles = StyleSheet.create({
   cardInfo: { flex: 1},
   cardTitle: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 3, },
   cardDesc: { fontSize: 12, fontFamily: 'Poppins-Regular', color: TEXT_MID, marginBottom: 5, lineHeight: 16, },
+  readMoreBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 2, marginBottom: 6, gap: 2, },
+  readMoreText: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: PRIMARY, },
   datesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   dateItem: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   dateText: { fontSize: 11, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT },
