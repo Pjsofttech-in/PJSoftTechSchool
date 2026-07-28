@@ -242,6 +242,60 @@ const FeeCard = ({fee, index}) => {
           value2={fee.gst > 0 ? fmt(fee.gst) : null}
         />
       </SectionCard>
+
+      {/* Payment Schedule */}
+      <SectionCard
+        title="Payment Schedule"
+        icon="calendar-check"
+        defaultOpen={false}>
+          
+          {Array.isArray(fee.scheduleList) && fee.scheduleList.length > 0 ? (
+            fee.scheduleList.map(item => (
+            <View key={item.id} style={styles.scheduleRow}>
+              {/* Left Side */}
+              <View style={styles.scheduleLeft}>
+                <Text style={styles.scheduleMonth}>{item.month}</Text>
+                <Text style={styles.scheduleDate}>
+                  Due: {item.dueDate}
+                </Text>
+              </View>
+              
+              {/* Right Side */}
+              <View style={styles.scheduleRight}>
+                <Text style={styles.scheduleAmount}>
+                  {fmt(item.collectAmount)}
+                </Text>
+                
+                {item.paid ? (
+                  <View style={styles.paidBadge}>
+                    <MatIcon
+                    name="check-circle"
+                    size={14}
+                    color={GREEN}
+                  />
+                  <Text style={styles.paidText}>Paid</Text>
+                  </View>
+                  ) : (
+                  <TouchableOpacity
+                  style={styles.payBtn}
+                  onPress={() => {
+                    console.log('Pay Installment:', item);
+                    // Future:
+                    // handlePayInstallment(item);
+                  }}>
+                    <Text style={styles.payBtnText}>Pay</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          ))
+        ) : (
+        <Text style={styles.emptyText}>
+          No payment schedule available.
+        </Text>
+      )}
+      
+      </SectionCard>
     </View>
   );
 };
@@ -427,6 +481,17 @@ const styles = StyleSheet.create({
   gridLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, },
   gridValue: { fontSize: 11, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginTop: 1, },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: GREY_1, padding: 24 },
+  scheduleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: GREY_2, },
+  scheduleLeft: { flex: 1 },
+  scheduleMonth: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
+  scheduleDate: { fontSize: 10, fontFamily: 'Poppins-Regular', color: TEXT_LIGHT, marginTop: 2, },
+  scheduleRight: {alignItems: 'flex-end', gap: 6, },
+  scheduleAmount: { fontSize: 12, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, marginBottom: 6 },
+  paidBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#dcfce7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, },
+  paidText: { marginLeft: 4, fontSize: 10, fontFamily: 'Poppins-SemiBold', color: GREEN, },
+  payBtn: { backgroundColor: PRIMARY, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8, },
+  payBtnText: { color: WHITE, fontSize: 10, fontFamily: 'Poppins-SemiBold', },
+  emptyText: { textAlign: 'center', paddingVertical: 12, color: TEXT_LIGHT, fontFamily: 'Poppins-Regular', },
   loadingText: { marginTop: 10, color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, },
   errorText: { color: TEXT_MID, fontFamily: 'Poppins-Regular', fontSize: 13, textAlign: 'center', marginHorizontal: 32, marginTop: 12, marginBottom: 16, },
   retryBtn: { backgroundColor: PRIMARY, paddingHorizontal: 28, paddingVertical: 9, borderRadius: 20, },
