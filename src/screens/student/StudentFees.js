@@ -174,7 +174,7 @@ const FeeCard = ({fee, index}) => {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryVal, {color: GREEN}]}>
+          <Text style={styles.summaryVal}>
             {fmt(paid) ?? '—'}
           </Text>
           <Text style={styles.summaryLabel}>Paid</Text>
@@ -355,7 +355,7 @@ const StudentFees = () => {
         </View>
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
-          <Text style={[styles.summaryVal, {color: '#a8f0c0'}]}>
+          <Text style={styles.summaryVal}>
             {fmt(totalPaid) ?? '—'}
           </Text>
           <Text style={styles.summaryLabel}>Paid</Text>
@@ -363,10 +363,7 @@ const StudentFees = () => {
         <View style={styles.summaryDivider} />
         <View style={styles.summaryItem}>
           <Text
-            style={[
-              styles.summaryVal,
-              {color: totalPending > 0 ? '#ffb3b3' : '#a8f0c0'},
-            ]}>
+            style={styles.summaryVal}>
             {fmt(totalPending) ?? '—'}
           </Text>
           <Text style={styles.summaryLabel}>Pending</Text>
@@ -401,9 +398,9 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, backgroundColor: WHITE, gap: 8, },
   backBtn: { padding: 4, borderRadius: 8, backgroundColor: PRIMARY_LIGHT },
   headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Poppins-SemiBold', color: TEXT_DARK, },
-  overallCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
+  overallCard: { flexDirection: 'row', backgroundColor: PRIMARY, paddingVertical: 14, paddingHorizontal: 8, elevation: 6, shadowColor: PRIMARY_DARK, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 8, },
   summaryItem: { flex: 1, alignItems: 'center'},
-  summaryVal: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: WHITE, lineHeight: 20, },
+  summaryVal: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: "#ffffff", lineHeight: 20, },
   summaryLabel: { fontSize: 10, fontFamily: 'Poppins-Regular', color: 'rgba(255,255,255,0.7)', marginTop: 1, },
   summaryDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.2)', marginVertical: 4, },
   scroll: {padding: 12, paddingTop: 14},
@@ -418,7 +415,7 @@ const styles = StyleSheet.create({
   progressBg: { flex: 1, height: 6, backgroundColor: GREY_2, borderRadius: 3, overflow: 'hidden', },
   progressFill: { height: '100%', borderRadius: 3, },
   progressPct: { fontSize: 10, fontFamily: 'Poppins-SemiBold', color: TEXT_MID, minWidth: 30, textAlign: 'right', },
-  summaryStrip: { flexDirection: 'row', backgroundColor: GREY_1, marginHorizontal: 12, borderRadius: 10, paddingVertical: 8, marginBottom: 10, },
+  summaryStrip: { flexDirection: 'row', backgroundColor: PRIMARY, marginHorizontal: 12, borderRadius: 10, paddingVertical: 8, marginBottom: 10, },
   card: { marginHorizontal: 12, marginBottom: 10, borderRadius: 10, overflow: 'hidden', borderWidth: 0.5, borderColor: GREY_2, },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 8, backgroundColor: PRIMARY_LIGHT, },
   cardHeaderLeft: {flexDirection: 'row', alignItems: 'center', gap: 6},
