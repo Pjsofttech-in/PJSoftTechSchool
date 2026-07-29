@@ -36,13 +36,13 @@ const LoginScreen = ({route}) => {
     student: {
       title: 'Student Login',
       subtitle: 'Welcome back, Student!',
-      color: '#34a853',
+      color: '#1a73e8',
       icon: 'account-school',
     },
     parent: {
       title: 'Parent Login',
       subtitle: 'Welcome back, Parent!',
-      color: '#fa7b17',
+      color: '#1a73e8',
       icon: 'account-child',
     },
   };
@@ -87,7 +87,10 @@ const LoginScreen = ({route}) => {
       login(token, data, data.role);
 
     } catch (error) {
-      setApiError(error.message);
+      setApiError(
+        error?.response?.data?.message ||
+        error?.message ||
+        'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -215,10 +218,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   header: {
-    paddingTop: 40,
+    paddingTop: 60,
     paddingBottom: 32,
     paddingHorizontal: 24,
     gap: 8,
+    borderBottomRightRadius: 25,
+    borderBottomLeftRadius: 25,
   },
   headerTitle: {
     fontSize: 26,
@@ -233,7 +238,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     padding: 24,
-    paddingTop: 32,
+    paddingTop: 40,
   },
   errorBanner: {
     flexDirection: 'row',
@@ -267,7 +272,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderWidth: 1.5,
     borderColor: '#dadce0',
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
     backgroundColor: '#ffffff',
     gap: 10,
@@ -292,7 +297,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   loginButton: {
-    height: 52,
+    height: 54,
     borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'center',
