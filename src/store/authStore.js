@@ -13,7 +13,7 @@ const useAuthStore = create(set => ({
     try {
       const {token, user, role} = await getSessionAsync();
       if (token && user && role) {
-        restoreSession(token, user, role); // restore cache for axios interceptor
+        restoreSession(token, user, role); // restore sync cache for axios interceptor
         set({
           token,
           user,
@@ -22,14 +22,29 @@ const useAuthStore = create(set => ({
           isLoading: false,
         });
       } else {
-        set({isLoading: false});
+        // If session is partial or invalid, reset storage completely
+        await clearSession();
+        set({
+          token: null,
+          user: null,
+          role: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
       }
     } catch (e) {
-      set({isLoading: false});
+      await clearSession();
+      set({
+        token: null,
+        user: null,
+        role: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
     }
   },
 
-  // Login
+  // Login — saves credentials and sets state
   login: async (token, user, role) => {
     await saveSession(token, user, role);
     set({
@@ -41,7 +56,7 @@ const useAuthStore = create(set => ({
     });
   },
 
-  // Logout
+  // Logout called manually or automatically by Axios interceptor on 401
   logout: async () => {
     await clearSession();
     set({
