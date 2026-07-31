@@ -261,4 +261,72 @@ export const studentApi = {
     }
   },
   
+  // Razorpay Payment Integration
+
+  // Get Razorpay Key ID by Branch Code
+  getPaymentGatewayDetails: async (role, email, branchCode) => {
+    try {
+      if (!role || !email || !branchCode) {
+        throw new Error('Role, email, and branchCode are required.');
+      }
+      const response = await api.get('/getPaymentGatewayDetailsByBrahchCode', {
+        params: { role, email, branchCode },
+      });
+      return response.data; // Returns key string (e.g., "rzp_test_...")
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to fetch payment gateway details.';
+      console.error(`[StudentApi] getPaymentGatewayDetails failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
+  // Create Razorpay Order ID
+  createPaymentOrderId: async (role, email, amount, studentFeeScheduleId) => {
+    try {
+      if (!role || !email || !amount || !studentFeeScheduleId) {
+        throw new Error('Role, email, amount, and fee schedule ID are required.');
+      }
+      const response = await api.post('/createPaymentOrderId', {
+        role,
+        email,
+        amount,
+        studentFeeScheduleId,
+      });
+      return response.data; // Expects { orderId: "order_123" }
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to create payment order ID.';
+      console.error(`[StudentApi] createPaymentOrderId failed: ${message}`);
+      throw new Error(message);
+    }
+  },
+
+  // Verify Payment Signature
+  verifyPaymentReceiptDetails: async (role, email, orderId, paymentId, signature) => {
+    try {
+      if (!role || !email || !orderId || !paymentId || !signature) {
+        throw new Error('Missing payment verification details.');
+      }
+      const response = await api.post('/verifyPaymentReceiptDetails', {
+        role,
+        email,
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+      });
+      return response.data;
+    } catch (error) {
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        'Payment verification failed.';
+      console.error(`[StudentApi] verifyPaymentReceiptDetails failed: ${message}`);
+      throw new Error(message);
+    }
+  },
 };

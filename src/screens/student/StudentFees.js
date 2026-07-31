@@ -1,10 +1,11 @@
 import React, {useEffect, useState, useCallback, useRef} from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Animated, } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, StatusBar, RefreshControl, Animated, Alert, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import {studentApi} from '@api/studentApi';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import RazorpayCheckout from 'react-native-razorpay';
 
 // Theme
 const PRIMARY = '#7b68ee';
@@ -94,7 +95,10 @@ const SectionCard = ({title, icon, children, defaultOpen = true}) => {
 };
 
 // Fee Card
-const FeeCard = ({fee, index}) => {
+// Fee Card
+const FeeCard = ({ fee, index, user, onSuccessPayment }) => {
+  const [payingScheduleId, setPayingScheduleId] = useState(null);
+
   const s = getStatusStyle(fee.feesStatus);
   const paid = fee.paidAmount ?? 0;
   const pending = fee.pendingAmount ?? 0;
@@ -121,6 +125,89 @@ const FeeCard = ({fee, index}) => {
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
   });
+
+  // Handle Pay Installment Flow
+  const handlePayInstallment = async (item) => {
+    try {
+      setPayingScheduleId(item.id);
+
+      const role = user?.role;
+      const email = user?.email;
+      const branchCode = fee?.branchCode;
+      const amount = item?.collectAmount;
+      const studentFeeScheduleId = item?.id;
+
+      if (!branchCode) {
+        Alert.alert('Error', 'Branch code missing for this fee record.');
+        return;
+      }
+
+      // 1. Get Key ID from backend
+      const keyId = await studentApi.getPaymentGatewayDetails(role, email, branchCode);
+      if (!keyId) {
+        Alert.alert('Error', 'Payment Gateway key ID not found.');
+        return;
+      }
+
+      // 2. Create Order ID on backend
+      const orderRes = await studentApi.createPaymentOrderId(
+        role,
+        email,
+        amount,
+        studentFeeScheduleId
+      );
+      const orderId = orderRes?.orderId;
+
+      if (!orderId) {
+        Alert.alert('Error', 'Failed to generate payment order ID.');
+        return;
+      }
+
+      // 3. Configure Razorpay Options
+      const options = {
+        description: `Fee Installment: ${item?.month || 'Payment'}`,
+        currency: 'INR',
+        key: keyId,
+        amount: Math.round(amount * 100), // Convert INR to paise
+        name: `${fee?.standardName || ''} Standard Fee`,
+        order_id: orderId,
+        prefill: {
+          email: user?.email || '',
+          contact: user?.phone || '',
+          name: fee?.studentName || user?.name || '',
+        },
+        theme: { color: PRIMARY },
+      };
+
+      // 4. Open Razorpay Modal
+      RazorpayCheckout.open(options)
+        .then(async (data) => {
+          // 5. Verify cryptographic signature on backend
+          await studentApi.verifyPaymentReceiptDetails(
+            role,
+            email,
+            data.razorpay_order_id,
+            data.razorpay_payment_id,
+            data.razorpay_signature
+          );
+
+          Alert.alert('Success', 'Transaction processing complete.');
+          if (onSuccessPayment) {
+            onSuccessPayment();
+          }
+        })
+        .catch((err) => {
+          console.warn('[Razorpay] Payment cancelled or failed:', err);
+          Alert.alert('Payment Cancelled', err.description || 'Transaction discarded.');
+        });
+
+    } catch (err) {
+      console.error('[Payment Error]:', err);
+      Alert.alert('Payment Error', err.message || 'Payment processing failed.');
+    } finally {
+      setPayingScheduleId(null);
+    }
+  };
 
   return (
     <View style={styles.feeCard}>
@@ -249,8 +336,8 @@ const FeeCard = ({fee, index}) => {
         icon="calendar-check"
         defaultOpen={false}>
           
-          {Array.isArray(fee.scheduleList) && fee.scheduleList.length > 0 ? (
-            fee.scheduleList.map(item => (
+        {Array.isArray(fee.scheduleList) && fee.scheduleList.length > 0 ? (
+          fee.scheduleList.map(item => (
             <View key={item.id} style={styles.scheduleRow}>
               {/* Left Side */}
               <View style={styles.scheduleLeft}>
@@ -275,25 +362,29 @@ const FeeCard = ({fee, index}) => {
                   />
                   <Text style={styles.paidText}>Paid</Text>
                   </View>
-                  ) : (
+                ) : (
                   <TouchableOpacity
-                  style={styles.payBtn}
-                  onPress={() => {
-                    console.log('Pay Installment:', item);
-                    // Future:
-                    // handlePayInstallment(item);
-                  }}>
-                    <Text style={styles.payBtnText}>Pay</Text>
+                    style={[
+                      styles.payBtn,
+                      payingScheduleId === item.id && { opacity: 0.6 }
+                    ]}
+                    disabled={payingScheduleId === item.id}
+                    onPress={() => handlePayInstallment(item)}>
+                    {payingScheduleId === item.id ? (
+                      <ActivityIndicator size="small" color={WHITE} />
+                    ) : (
+                      <Text style={styles.payBtnText}>Pay</Text>
+                    )}
                   </TouchableOpacity>
                 )}
               </View>
             </View>
           ))
         ) : (
-        <Text style={styles.emptyText}>
-          No payment schedule available.
-        </Text>
-      )}
+          <Text style={styles.emptyText}>
+            No payment schedule available.
+          </Text>
+        )}
       
       </SectionCard>
     </View>
@@ -439,7 +530,13 @@ const StudentFees = () => {
           />
         }>
         {fees.map((fee, index) => (
-          <FeeCard key={fee.fid ?? index} fee={fee} index={index} />
+          <FeeCard
+            key={fee.fid ?? index}
+            fee={fee}
+            index={index}
+            user={user}
+            onSuccessPayment={fetchFees}
+            />
         ))}
       </ScrollView>
     </View>
