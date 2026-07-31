@@ -15,10 +15,12 @@ const api = axios.create({
 // Request interceptor — attach token to every request
 api.interceptors.request.use(
   config => {
-    const {token} = getSession();
+    let token = getSession()?.token || useAuthStore.getState().token;
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   error => Promise.reject(error),
@@ -32,23 +34,15 @@ api.interceptors.response.use(
     const serverMessage = error.response?.data?.message;
     const isLoginRequest = error.config?.url?.includes('Login');
 
-    // Use server message if available
-    if (serverMessage) {
-      error.message = serverMessage;
-      return Promise.reject(error);
-    }
-
     switch (status) {
       case 400:
-        error.message = 'Invalid request. Please check your details.';
+        error.message = serverMessage || 'Invalid request. Please check your details.';
         break;
 
       case 401:
         if (isLoginRequest) {
-          // Wrong credentials during login
-          error.message = 'Invalid email or password. Please try again.';
+          error.message = serverMessage || 'Invalid credentials. Please try again.';
         } else {
-          // JWT expired on an authenticated request
           error.message = 'Session expired. Please login again.';
           clearSession();
           useAuthStore.getState().logout();
@@ -56,26 +50,26 @@ api.interceptors.response.use(
         break;
 
       case 403:
-        error.message = 'Access denied. Contact your administrator.';
+        error.message = serverMessage || 'Access denied. Contact your administrator.';
         break;
 
       case 404:
-        error.message = 'Account not found. Please check your email.';
+        error.message = serverMessage || 'Resource not found.';
         break;
 
       case 500:
-        error.message = 'Server error. Please try again later.';
+        error.message = serverMessage || 'Server error. Please try again later.';
         break;
 
       case 503:
-        error.message = 'Service unavailable. Please try again later.';
+        error.message = serverMessage || 'Service unavailable. Please try again later.';
         break;
 
       default:
         if (!error.response) {
           error.message = 'Network error. Please check your connection.';
         } else {
-          error.message = 'Something went wrong. Please try again.';
+          error.message = serverMessage || 'Something went wrong. Please try again.';
         }
     }
 
