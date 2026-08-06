@@ -245,21 +245,27 @@ const StudentAssignments = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
 
   const fetchAssignments = useCallback(async () => {
-    try {
-      setError(null);
-      const student = await studentApi.getStudentById(user?.id, user?.role, user?.email);
-      const data = await studentApi.getAssignments(student?.classsRoomId, user?.role, user?.email);
-      
-      setDescriptionMeta({});
-      setAssignments(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error('[StudentAssignments] fetch error:', e.message);
-      setError(e.message || 'Failed to load assignments.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [user]);
+  try {
+    setError(null);
+    const student = await studentApi.getStudentById(user?.id, user?.role, user?.email);
+    const data = await studentApi.getAssignments(student?.classsRoomId, user?.role, user?.email);
+    
+    setDescriptionMeta({});
+
+    // Sort latest assignments to the top
+    const sortedData = Array.isArray(data) 
+      ? [...data].sort((a, b) => b.id - a.id) 
+      : [];
+
+    setAssignments(sortedData);
+  } catch (e) {
+    console.error('[StudentAssignments] fetch error:', e.message);
+    setError(e.message || 'Failed to load assignments.');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}, [user]);
 
   useEffect(() => {
     fetchAssignments();
