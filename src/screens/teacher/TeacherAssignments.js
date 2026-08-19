@@ -94,7 +94,16 @@ export class TeacherAssignments extends Component {
     try {
       const { user } = useAuthStore.getState();
       const data = await teacherApi.getAssignmentsByClass(user.email, classId);
-      this.setState({ assignments: data, modalLoading: false });
+      const sortedAssignments = [...(data || [])].sort((a, b) => {
+        const dateDifference =
+        new Date(b.createdDate) - new Date(a.createdDate);
+        
+        return dateDifference || b.id - a.id;
+      });
+      this.setState({ 
+        assignments: sortedAssignments,
+        modalLoading: false
+      });
     } catch (err) {
       console.error('Fetch Assignments Error:', err);
       this.setState({ modalLoading: false, assignmentError: 'Failed to load assignments.' });
