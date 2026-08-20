@@ -442,7 +442,7 @@ const TeacherResultContent = () => {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#ffffff" barStyle="dark-content" />
+      <StatusBar backgroundColor="#000" barStyle="light-content" />
 
       <View style={[styles.appbar, { paddingTop: Math.max(12, insets.top) }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} android_ripple={CIRCLE_RIPPLE}>

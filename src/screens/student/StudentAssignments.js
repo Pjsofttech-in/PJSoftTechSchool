@@ -406,7 +406,7 @@ const StudentAssignments = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryItem}>

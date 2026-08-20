@@ -30,19 +30,19 @@ const LoginScreen = ({route}) => {
     teacher: {
       title: 'Teacher Login',
       subtitle: 'Welcome back, Teacher!',
-      color: '#1a73e8',
+      color: '#6495ED',
       icon: 'human-male-board',
     },
     student: {
       title: 'Student Login',
       subtitle: 'Welcome back, Student!',
-      color: '#1a73e8',
+      color: '#6495ED',
       icon: 'account-school',
     },
     parent: {
       title: 'Parent Login',
       subtitle: 'Welcome back, Parent!',
-      color: '#1a73e8',
+      color: '#6495ED',
       icon: 'account-child',
     },
   };

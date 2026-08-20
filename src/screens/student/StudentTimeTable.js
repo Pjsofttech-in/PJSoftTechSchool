@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, SafeAreaView, ScrollView } from 'react-native';
+import { Text, View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, StatusBar, ScrollView } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { studentApi } from '@api/studentApi';
@@ -170,7 +170,9 @@ export class StudentTimeTable extends Component {
     const periodsForDay = timetable[selectedDay] || [];
 
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
 
         {/* Header */}
         <View style={styles.header}>
@@ -204,7 +206,7 @@ export class StudentTimeTable extends Component {
           }
         />
 
-      </SafeAreaView>
+      </View>
     );
   }
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, StatusBar, RefreshControl, SafeAreaView, Dimensions, } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, ActivityIndicator, StatusBar, RefreshControl, Dimensions, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -58,8 +58,8 @@ const TeacherProfile = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={BG_DARK} />
+    <View style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
       
       <ScrollView 
         style={styles.container}
@@ -172,7 +172,7 @@ const TeacherProfile = () => {
 
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

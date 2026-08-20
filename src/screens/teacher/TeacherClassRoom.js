@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Linking, Platform, StatusBar, RefreshControl, TextInput, Alert, KeyboardAvoidingView, Image  } from 'react-native';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, Modal, Linking, Platform, StatusBar, RefreshControl, TextInput, Alert, KeyboardAvoidingView, Image  } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -317,8 +317,8 @@ export const TeacherClassRoom = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#f4f5f9" barStyle="dark-content" />
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#000" barStyle="light-content" />
       <ClassroomFilterBar email={userEmail} onApply={handleFilterApply} />
 
       {loading ? (
@@ -457,7 +457,7 @@ export const TeacherClassRoom = () => {
         </KeyboardAvoidingView>
       </Modal>
 
-    </SafeAreaView>
+    </View>
   );
 };
 

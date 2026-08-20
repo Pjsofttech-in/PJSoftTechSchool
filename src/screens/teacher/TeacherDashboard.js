@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, SafeAreaView, Modal, ScrollView, TouchableWithoutFeedback, StatusBar, RefreshControl, Pressable, } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Dimensions, ActivityIndicator, Modal, ScrollView, TouchableWithoutFeedback, StatusBar, RefreshControl, Pressable, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -185,8 +185,8 @@ export const TeacherDashboard = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor={BG_LIGHT} barStyle="dark-content" />
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#000" barStyle="light-content" />
       
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -306,7 +306,7 @@ export const TeacherDashboard = ({ navigation }) => {
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

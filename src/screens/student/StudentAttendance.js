@@ -270,7 +270,7 @@ const StudentAttendance = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="light-content" backgroundColor={PRIMARY} />
+      <StatusBar barStyle="light-content" backgroundColor="000" />
 
       {/* Filter Chips */}
       <ScrollView

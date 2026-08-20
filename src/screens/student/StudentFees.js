@@ -476,7 +476,7 @@ const StudentFees = () => {
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" transparent={true} />
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
 
       <View style={[
         styles.header, 

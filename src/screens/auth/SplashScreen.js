@@ -18,7 +18,7 @@ const SplashScreen = ({navigation}) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a73e8" />
+      <StatusBar barStyle="light-content" backgroundColor="#6495ED" />
       <Text style={styles.appName}>PJSoftTech</Text>
       <Text style={styles.tagline}>Smart School Management</Text>
     </View>
@@ -28,7 +28,7 @@ const SplashScreen = ({navigation}) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#6495ED',
     justifyContent: 'center',
     alignItems: 'center',
   },

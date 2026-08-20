@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Dimensions, RefreshControl, StatusBar, Alert, } from 'react-native';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, Modal, Dimensions, RefreshControl, StatusBar, Alert, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -294,8 +294,8 @@ export const TeacherAttendance = () => {
   const isAllSelected = filteredData.length > 0 && selectedRollNos.length === filteredData.length;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar backgroundColor="#f4f7ff" barStyle="dark-content" />
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#000" barStyle="light-content" />
       <ClassroomFilterBar key={filterResetKey} email={user?.email} onApply={handleFilterApply} />
 
       {loading ? (
@@ -456,7 +456,7 @@ export const TeacherAttendance = () => {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 };
 

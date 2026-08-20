@@ -13,19 +13,19 @@ const roles = [
   {
     id: 'teacher',
     label: 'Continue as Teacher',
-    color: '#1a73e8',
+    color: '#6495ED',
     icon: 'human-male-board',
   },
   {
     id: 'student',
     label: 'Continue as Student',
-    color: '#1a73e8',
+    color: '#6495ED',
     icon: 'account-school',
   },
   {
     id: 'parent',
     label: 'Continue as Parent',
-    color: '#1a73e8',
+    color: '#6495ED',
     icon: 'account-child',
   },
 ];
@@ -37,7 +37,7 @@ const RoleSelectScreen = ({navigation}) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#1a73e8" />
+      <StatusBar barStyle="light-content" backgroundColor="#6495ED" />
 
       {/* Top Section */}
       <View style={styles.header}>
@@ -51,7 +51,7 @@ const RoleSelectScreen = ({navigation}) => {
         <MatIcon
           name="school"
           size={72}
-          color="#1a73e8"
+          color="#6495ED"
           style={styles.schoolIcon}
         />
         <Text style={styles.welcomeText}>Welcome Back</Text>
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   header: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#6495ED',
     paddingTop: 60,
     paddingBottom: 32,
     paddingHorizontal: 24,

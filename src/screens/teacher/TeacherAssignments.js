@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, SafeAreaView, Modal, Dimensions, Image, ScrollView, TextInput, ToastAndroid, KeyboardAvoidingView, StatusBar, RefreshControl, Linking, } from 'react-native';
+import { Text, View, StyleSheet, FlatList, Pressable, ActivityIndicator, Modal, Dimensions, Image, ScrollView, TextInput, ToastAndroid, KeyboardAvoidingView, StatusBar, RefreshControl, Linking, } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import useAuthStore from '@store/authStore';
 import { teacherApi } from '@api/teacherApi';
@@ -290,8 +290,8 @@ export class TeacherAssignments extends Component {
     }
 
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar backgroundColor="#f4f5f9" barStyle="dark-content" />
+      <View style={styles.container}>
+        <StatusBar backgroundColor="#000" barStyle="light-content" />
         <ClassroomFilterBar email={user.email} onApply={this.handleFilterApply} />
 
         {loading ? (
@@ -495,7 +495,7 @@ export class TeacherAssignments extends Component {
             )}
           </View>
         </Modal>
-      </SafeAreaView>
+      </View>
     );
   }
 }
