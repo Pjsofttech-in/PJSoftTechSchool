@@ -115,6 +115,23 @@ export const teacherApi = {
     }
   },
 
+  // by lecture
+  getAttendanceByLecture: async (classroomId, scheduledPeriodId) => {
+  const response = await api.post(
+    `/getAttendaceByClassroom/${classroomId}/lecture/${scheduledPeriodId}`,
+    {},
+    {
+      params: {
+        timeFrame: 'today',
+        page: 0,
+        size: 500,
+      },
+    }
+  );
+
+  return response.data;
+},
+
   // Get Students by classRoomId to list particular class students
   getStudentsByClass: async (email, classRoomId) => {
     const response = await api.get(`/getStudentByClassRoomId`, {
@@ -332,6 +349,33 @@ export const teacherApi = {
       throw new Error(message);
     }
   },
+
+  // Submit student attendance for a specific lecture
+markStudentAttendanceForLecture: async (
+  classroomId,
+  scheduledPeriodId,
+  rollNos
+) => {
+  try {
+    const response = await api.post(
+      `/markStudentAttenndance/classroom/${classroomId}/period/${scheduledPeriodId}`,
+      rollNos
+    );
+
+    return response.data;
+  } catch (error) {
+    const message =
+      error.response?.data?.message ||
+      error.message ||
+      'Failed to submit lecture attendance.';
+
+    console.error(
+      `[TeacherApi] markStudentAttendanceForLecture failed: ${message}`
+    );
+
+    throw new Error(message);
+  }
+},
 
   // Get historical analytics specific student across the academic calendar
   getResultByStudentAndAcademicYear: async (email, studentId) => {
