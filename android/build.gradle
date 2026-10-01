@@ -1,9 +1,9 @@
 buildscript {
     ext {
-        buildToolsVersion = "35.0.0"
+        buildToolsVersion = "36.0.0"
         minSdkVersion = 24
-        compileSdkVersion = 36  // Set to 36 to satisfy AndroidX dependencies
-        targetSdkVersion = 34   // Keep at 34 for stable runtime behavior
+        compileSdkVersion = 36
+        targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
     }
@@ -18,5 +18,4 @@ buildscript {
         classpath("com.google.gms:google-services:4.4.2")
     }
 }
-
 apply plugin: "com.facebook.react.rootproject"
