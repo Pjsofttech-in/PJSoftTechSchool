@@ -13,7 +13,15 @@ import {
 } from 'react-native';
 import MatIcon from '@react-native-vector-icons/material-design-icons';
 import {authApi} from '@api/authApi';
+import deviceApi from '@api/deviceApi';
 import useAuthStore from '@store/authStore';
+
+import {
+  getFirebaseFid,
+  getDeviceType,
+  getDeviceName,
+  getAppVersion,
+} from '@utils/deviceUtils';
 
 const LoginScreen = ({route}) => {
   const {role} = route.params;
@@ -52,16 +60,19 @@ const LoginScreen = ({route}) => {
   // Validate form
   const validate = () => {
     const newErrors = {};
+
     if (!email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Enter a valid email';
     }
+
     if (!password.trim()) {
       newErrors.password = 'Password is required';
     } else if (password.length < 3) {
       newErrors.password = 'Password must be at least 3 characters';
     }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -69,28 +80,65 @@ const LoginScreen = ({route}) => {
   // Handle login
   const handleLogin = async () => {
     if (!validate()) return;
+
     setApiError('');
     setLoading(true);
 
     try {
       let response;
+
       if (role === 'teacher') {
         response = await authApi.teacherLogin({email, password});
       } else if (role === 'student') {
         response = await authApi.studentLogin({email, password});
+      } else if (role === 'parent') {
+        response = await authApi.parentLogin({email, password});
       }
-       else if (role === 'parent') {
-         response = await authApi.parentLogin({email, password});
-       }
 
       const {token, data} = response.data;
-      login(token, data, data.role);
 
+      // Save successful login session first
+      await login(token, data, data.role);
+
+      // Register this device after successful login
+      try {
+        const fid = await getFirebaseFid();
+        const deviceType = getDeviceType();
+        const deviceName = await getDeviceName();
+        const appVersion = getAppVersion();
+
+        console.log('====================================');
+        console.log('REGISTERING DEVICE');
+        console.log('FID:', fid);
+        console.log('Device Type:', deviceType);
+        console.log('Device Name:', deviceName);
+        console.log('App Version:', appVersion);
+        console.log('====================================');
+
+        const registrationResponse = await deviceApi.registerDevice({
+          fid,
+          deviceType,
+          deviceName,
+          appVersion,
+        });
+
+        console.log(
+          'Device registration successful:',
+          registrationResponse,
+        );
+      } catch (deviceError) {
+        // Device registration failure must NOT block successful login
+        console.error(
+          'Device registration failed:',
+          deviceError?.response?.data || deviceError?.message || deviceError,
+        );
+      }
     } catch (error) {
       setApiError(
         error?.response?.data?.message ||
-        error?.message ||
-        'Login failed. Please try again.');
+          error?.message ||
+          'Login failed. Please try again.',
+      );
     } finally {
       setLoading(false);
     }
@@ -130,6 +178,7 @@ const LoginScreen = ({route}) => {
                 errors.email && styles.inputError,
               ]}>
               <MatIcon name="email-outline" size={20} color="#80868b" />
+
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
@@ -143,6 +192,7 @@ const LoginScreen = ({route}) => {
                 }}
               />
             </View>
+
             {errors.email ? (
               <Text style={styles.errorText}>{errors.email}</Text>
             ) : null}
@@ -151,12 +201,14 @@ const LoginScreen = ({route}) => {
           {/* Password Input */}
           <View style={styles.inputWrapper}>
             <Text style={styles.inputLabel}>Password</Text>
+
             <View
               style={[
                 styles.inputContainer,
                 errors.password && styles.inputError,
               ]}>
               <MatIcon name="lock-outline" size={20} color="#80868b" />
+
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
@@ -168,6 +220,7 @@ const LoginScreen = ({route}) => {
                   if (errors.password) setErrors({...errors, password: ''});
                 }}
               />
+
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeButton}>
@@ -178,6 +231,7 @@ const LoginScreen = ({route}) => {
                 />
               </TouchableOpacity>
             </View>
+
             {errors.password ? (
               <Text style={styles.errorText}>{errors.password}</Text>
             ) : null}
@@ -202,7 +256,6 @@ const LoginScreen = ({route}) => {
               </>
             )}
           </TouchableOpacity>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

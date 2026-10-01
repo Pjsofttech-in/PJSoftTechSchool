@@ -15,7 +15,8 @@ const api = axios.create({
 // Request interceptor — attach token to every request
 api.interceptors.request.use(
   config => {
-    let token = getSession()?.token || useAuthStore.getState().token;
+    const token =
+      getSession()?.token || useAuthStore.getState().token;
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -29,47 +30,76 @@ api.interceptors.request.use(
 // Response interceptor — handle all errors globally
 api.interceptors.response.use(
   response => response,
-  error => {
+  async error => {
     const status = error.response?.status;
     const serverMessage = error.response?.data?.message;
     const isLoginRequest = error.config?.url?.includes('Login');
 
     switch (status) {
       case 400:
-        error.message = serverMessage || 'Invalid request. Please check your details.';
+        error.message =
+          serverMessage ||
+          'Invalid request. Please check your details.';
         break;
 
       case 401:
         if (isLoginRequest) {
-          error.message = serverMessage || 'Invalid credentials. Please try again.';
+          error.message =
+            serverMessage ||
+            'Invalid credentials. Please try again.';
         } else {
-          error.message = 'Session expired. Please login again.';
-          clearSession();
-          useAuthStore.getState().logout();
+          error.message =
+            'Session expired. Please login again.';
+
+          // Do NOT clear the session here.
+          // authStore.logout() must deactivate the device
+          // before clearing the session.
+          try {
+            await useAuthStore.getState().logout();
+          } catch (logoutError) {
+            console.error(
+              'Error during automatic logout:',
+              logoutError,
+            );
+
+            // Safety fallback
+            await clearSession();
+          }
         }
         break;
 
       case 403:
-        error.message = serverMessage || 'Access denied. Contact your administrator.';
+        error.message =
+          serverMessage ||
+          'Access denied. Contact your administrator.';
         break;
 
       case 404:
-        error.message = serverMessage || 'Resource not found.';
+        error.message =
+          serverMessage ||
+          'Resource not found.';
         break;
 
       case 500:
-        error.message = serverMessage || 'Server error. Please try again later.';
+        error.message =
+          serverMessage ||
+          'Server error. Please try again later.';
         break;
 
       case 503:
-        error.message = serverMessage || 'Service unavailable. Please try again later.';
+        error.message =
+          serverMessage ||
+          'Service unavailable. Please try again later.';
         break;
 
       default:
         if (!error.response) {
-          error.message = 'Network error. Please check your connection.';
+          error.message =
+            'Network error. Please check your connection.';
         } else {
-          error.message = serverMessage || 'Something went wrong. Please try again.';
+          error.message =
+            serverMessage ||
+            'Something went wrong. Please try again.';
         }
     }
 
