@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "562660405892",
-    "project_id": "pjsofttechschool-ebf90",
-    "storage_bucket": "pjsofttechschool-ebf90.firebasestorage.app"
+    "project_number": "345597086121",
+    "project_id": "pjsofttechschool",
+    "storage_bucket": "pjsofttechschool.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:562660405892:android:6efbb74117e3edb07788d1",
+        "mobilesdk_app_id": "1:345597086121:android:f0705f452254d637d89cb8",
         "android_client_info": {
           "package_name": "com.pjsofttech.schoolteacherapp"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBrILZsORG6hqrUy0ARscHC9sVi3R7e9I0"
+          "current_key": "AIzaSyBGI7-_ZXm1FPi8saDiBIwVIT9zBZbwx60"
         }
       ],
       "services": {
