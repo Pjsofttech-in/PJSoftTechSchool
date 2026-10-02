@@ -18,6 +18,8 @@ import {
   getAppVersion,
 } from '@utils/deviceUtils';
 
+import checkForAppUpdate from '@services/appUpdateService';
+
 const App = () => {
   useEffect(() => {
     async function getFcmToken() {
@@ -80,6 +82,13 @@ const App = () => {
     }
 
     getFcmToken();
+  }, []);
+
+  // Check for Google Play Flexible In-App Update
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      checkForAppUpdate();
+    }
   }, []);
 
   return (
